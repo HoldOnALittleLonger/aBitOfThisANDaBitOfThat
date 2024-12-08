@@ -7,7 +7,30 @@
       )
   )
 
+(define (sizeof_list the_list)
+  (if (null? the_list)
+      0
+      (+ 1 (sizeof_list (cdr the_list)))
+      )
+  )
+
+(define (sequence_sum sequence)
+  (if (null? sequence)
+      0
+      (+ (car sequence) (sequence_sum (cdr sequence)))
+      )
+  )
+
+(define (log-2 x) (/ (log x) (log 2)))
+
+;;  ceiling is a build-in procedure
+(define (ceiling-log-2 x) (ceiling (log-2 x)))
+
+;;  scheme provides (ceiling)
+
 ;;  fibonacci heap
+
+;;  FOREST
 
 ;;  fibHeap-null-forest - no tree-heads in forest.
 (define fibHeap-null-forest '())
@@ -27,19 +50,29 @@
   (cons tree-head forest)
   )
 
-;;  fibHeap-makeup-single-tree-forest - make up forest it just contains
-;;                                      a tree
-;;  @tree-head:                         the tree-head contains the
-;;                                      tree
-;;  return:                             the single tree forest
-;;  #  this procedure is used by (fibHeap-insert) as usual.
-(define (fibHeap-makeup-single-tree-forest tree-head)
-  (cons tree-head fibHeap-null-forest)
+;;  fibHeap-makeup-forest-notrees-with-max-rank - pre-allloc a forest which has the
+;;                                                maximum rank @rank
+;;  @rank:                                        the maximum rank
+;;  return:                                       a forest is mady up through (@rank + 1)
+;;                                                tree-head-placeholders
+(define (fibHeap-makeup-forest-notrees-with-max-rank rank)
+  (define (makeup rank counter)
+    (if (= 0 counter)
+        (fibHeap-forest-insert
+         (fibHeap-tree-head-placeholder rank)
+         fibHeap-null-forest)
+        (cons (fibHeap-tree-head-placeholder rank)
+              (makeup (+ 1 rank) (- counter 1))
+              )
+        )
+    )
+
+  (makeup 0 (+ 1 rank))
   )
 
 ;;  fibHeap-forest-tree-head - retrieve the first tree-head in the forest
 ;;  @forest:                   the forest
-;;  return:                    nil => @forest is null
+;;  return:                    NIL => null forest
 ;;                             1st tree-head
 (define (fibHeap-forest-tree-head forest)
   (if (null? forest)
@@ -48,15 +81,13 @@
       )
   )
 
-;;  call (car) or (cdr) on '() is an error
-
 ;;  fibHeap-forest-rest - the rest of the forest
 ;;  @forest:              the forest
 ;;  return:               nil => @forest is null
 ;;                        (cdr @forest)
 (define (fibHeap-forest-rest forest)
   (if (null? forest)
-      '()
+      fibHeap-null-forest
       (cdr forest)
       )
   )
@@ -71,6 +102,10 @@
 ;;             =>  link t2 into t1,t2 as a child of t1 now
 ;;    =>  update t1's rank
 ;;        (set! (rank t1) (+ 1 (rank t1)))  
+
+
+;;  TREE-HEAD
+
 
 ;;  fibHeap-makeup-tree-head - each tree-head is an element in the forest,
 ;;                             tree-head { rank trees }
@@ -138,6 +173,10 @@
   (fibHeap-makeup-tree-head new-rank (fibHeap-tree-head-trees tree-head))
   )
 
+
+;;  TREE-NODE
+
+
 ;;  fibHeap-node-lc-counter-max -
 ;;    a node is not root,then everytime it lose a child,
 ;;    node.lc-counter must be increased.
@@ -159,6 +198,8 @@
 (define (fibHeap-makeup-node key childs lc-counter r-bit)
   (list key childs lc-counter r-bit)
   )
+
+(define fibHeap-null-node '())
 
 (define (fibHeap-makeup-init-node key)
   (fibHeap-makeup-node key '()
@@ -190,15 +231,343 @@
    )
   )
 
-
-(define (fibHeap-node-modify-childs node new-childs)
-  (fibHeap-makeup-node
-   (fibHeap-node-key node)
-   new-childs
-   (fibHeap-node-lc-counter node)
-   (fibHeap-node-r-bit node)
+;;  fibHeap-node-is-key-exist? - if a node contains @key is a descent of
+;;                               @root
+(define (fibHeap-node-is-key-exist? key root)
+  (define (scan-childs childs)
+    (if (eq? fibHeap-null-node childs)
+        #f
+        (or (fibHeap-node-is-key-exist? key (car childs))
+            (scan-childs (cdr childs))
+            )
+        )
+    )
+  (cond
+   ((eq? fibHeap-null-node root)
+    #f
+    )
+   ((= key (fibHeap-node-key root))
+    #t
+    )
+   (else
+    (scan-childs (fibHeap-node-childs root))
+    )
    )
   )
+
+
+
+
+
+;;  fibHeap-node-cascade-cut-off - cut off a node from tree,and process a
+;;                                 cascade cut off,if necessary
+;;  @node-key:                     the key of node is going to cutting off
+;;  @tree:                         the tree which contains the node
+;;  return:                        cascade cut off makeup a new forest,
+;;                                 the forest is constructed by
+;;                                 a tree it owns a ROOT is the node which contains
+;;                                 @node-key,
+;;                                 probably existed parent of the node which suffered
+;;                                 cascade cut off,
+;;                                 and remain of @tree,
+;;                                 add some tree-head-placeholders
+(define (fibHeap-node-cascade-cut-off node-key tree)
+
+  ;;  place-tree-head-on-proper-pos - internal procedure used to
+  ;;                                  place a tree-head on the position
+  ;;                                  where the rank as same the tree-head's
+  ;;                                  in forest
+  ;;  @tree-head:                     the tree-head to place
+  ;;  @forest:                        the forest
+  ;;  return:                         new forest where @tree-head on correct pos
+  ;;                                  NIL forest if @forest is NIL
+  (define (place-tree-head-on-proper-pos tree-head forest)
+    (cond
+     ((eq? fibHeap-null-forest forest)
+       fibHeap-null-forest
+       )
+     ((= (fibHeap-tree-head-rank tree-head)
+         (fibHeap-tree-head-rank (fibHeap-forest-tree-head forest))
+         )
+      (fibHeap-forest-insert
+       (fibHeap-tree-head-combine tree-head
+                                  (fibHeap-forest-tree-head forest)
+                                  )
+       (fibHeap-forest-rest forest)
+       )
+      )
+     (else
+      (fibHeap-forest-insert
+       (fibHeap-forest-tree-head forest)
+       (place-tree-head-on-proper-pos tree-head (fibHeap-forest-rest forest))
+       )
+      )
+     )
+    )
+
+
+
+  ;;  cut-off-descendant - the node have to be cut off is a descendant
+  ;;                       of the tree
+  ;;  @parent:             root of the tree to search
+  ;;  return:              a new forest which is constructed
+  ;;                       by some descendants.
+  ;;  #  cut-off:
+  ;;       X-forest { ... X ... }
+  ;;     cascade cut-off:
+  ;;       cascade-forest { ... X'parent ... }
+  ;;     remain:
+  ;;       @tree-forest { ... @tree - X - X'parent ... }
+  ;;     finally:
+  ;;       finally-forest { (merge X-forest (merge cascade-forest @tree-forest)) }
+  (define (cut-off-descendant parent)
+
+    ;;  enter-childs - call to procedure cut-off-descendant on each child
+    ;;  @childs:       child list
+    ;;  retunr:        a forest that merged each (cut-off-descendant child) return
+    (define (enter-childs childs)
+      (cond
+       ((eq? fibHeap-null-node childs)
+        fibHeap-null-forest
+        )
+       (else
+        (fibHeap-merge (cut-off-descendant (car childs))
+                       (enter-childs (cdr childs))
+                       )
+        )
+       )
+      )
+
+    ;;  check-childs - check whether the node we want cut off is in @childs
+    ;;                 of the parent node
+    ;;  @childs:       the list of childs
+    ;;  return:        #t => find out
+    ;;                 otherwise #f
+    (define (check-childs childs)
+      (if (or (null? childs) (not (= node-key (fibHeap-node-key (car childs)))))
+          (or #f (check-childs (cdr childs)))
+          #t
+          )
+      )
+
+    ;;  find-from-childs - retrieve the node we want from @childs of current parent
+    ;;  @childs:           child list
+    ;;  return:            X => find out
+    ;;                     NIL => not exist
+    (define (find-from-childs childs)
+      (cond
+       ((null? childs)
+        fibHeap-null-node
+        )
+       ((= node-key (fibHeap-node-key (car childs)))
+        (car childs))
+       (else
+        (find-from-childs (cdr childs))
+        )
+       )
+      )
+
+    ;;  unlink-X-from-childs - unlink X to childs
+    ;;  @X:                    the node to unlink
+    ;;  @childs:               child list
+    ;;  return:                updated child list
+    (define (unlink-X-from-childs X childs)
+      (cond
+       ((eq? fibHeap-null-node childs)
+        '())
+       ((= X (fibHeap-node-key (car childs)))
+        (cdr childs)
+        )
+       (else
+        (cons (car childs)
+              (unlink-X-from-childs X (cdr childs))
+              )
+        )
+       )
+      )
+
+    (let
+        ((childs (fibHeap-node-childs parent))
+         )
+      (if (not (check-childs childs))
+          (enter-childs parent)
+          (let*
+              ((node (find-from-childs childs))
+               (new-childs (unlink-X-from-childs node childs))
+               (the-parent parent)
+               )
+            (let*
+                ((node-tree-head (fibHeap-makeup-tree-head
+                                  (fibHeap-node-calculate-rank node)
+                                  node)
+                                 )
+                 (node-forest (place-tree-head-on-proper-pos
+                               node-tree-head
+                               (fibHeap-makeup-forest-notrees-with-rank
+                                (fibHeap-tree-head-rank node-tree-head)
+                                )
+                               )
+                              )
+                 (updated-parent
+                  (fibHeap-node-increase-lc-counter
+                   (fibHeap-makeup-node
+                    (fibHeap-node-key the-parent)
+                    new-childs
+                    (fibHeap-node-r-bit the-parent)
+                    )
+                   )
+                  )
+                 )
+
+              (if (fibHeap-node-should-cascade-cut-off? updated-parent)
+                  (fibHeap-merge node-forest (fibHeap-node-cascade-cut-off 
+                                              (fibHeap-node-key updated-parent)
+                                              tree)
+                                 )
+                  (let
+                      ((tree-tree-head (fibHeap-makeup-tree-head 
+                                        (fibHeap-node-calculate-rank tree)
+                                        tree)
+                                       )
+                       )
+                    (fibHeap-merge node-forest
+                                   (place-tree-head-on-proper-pos
+                                    tree-tree-head
+                                    (fibHeap-makeup-forest-notrees-with-max-rank
+                                     (fibHeap-tree-head-rank tree-tree-head)
+                                     )
+                                    )
+                                   )
+                    )
+                  )
+              )
+            )
+          )
+      )
+    )
+                  
+
+          
+
+
+
+      
+
+  ;;  cut-off-root - the node we want to cut off is the ROOT of
+  ;;                 @tree
+  ;;  @tree:         the tree
+  ;;  return:        a new forest constructed by
+  ;;                 ROOT of @tree and childs of ROOT
+  (define (cut-off-root tree)
+
+    ;;  get-maximum-rank-from-tree-heads - find the maximum rank in 
+    ;;                                     tree-head list
+    ;;  @current:                          maximum rank saver
+    ;;  @sequence:                         tree-head list
+    ;;  return:                            @current
+    (define (get-maximum-rank-from-tree-heads current sequence)
+      (cond 
+       ((null? sequence)
+        current
+        )
+       ((> current (fibHeap-tree-head-rank (car sequence)))
+        (get-maximum-rank (fibHeap-tree-head-rank
+                           (car sequence)
+                           )
+                          )
+        )
+       (else
+        (get-maximum-rank current (cdr sequence))
+        )
+       )
+      )
+
+
+    ;;  root - local variable represents
+    ;;         ROOT of @tree
+    (define root (fibHeap-makeup-node
+                  node-key
+                  '()
+                  fibHeap-node-lc-counter-init
+                  fibHeap-node-r-bit-on
+                  )
+      )
+
+    ;;  childs-tree-head - local variable represents
+    ;;                     a tree-head list about all
+    ;;                     childs' tree-head
+    (define childs-tree-head (map (lambda (child)
+                                    (let
+                                        ((temp (fibHeap-node-reset-lc-counter
+                                                (fibHeap-node-modify-r-bit
+                                                 child
+                                                 fibHeap-node-r-bit-on
+                                                 )
+                                                )
+                                               )
+                                         )
+                                      (fibHeap-makeup-tree-head
+                                       (fibHeap-node-calculate-rank temp)
+                                       temp)
+                                      )
+                                    )
+                                  (fibHeap-node-childs tree)
+                                  )
+      )
+
+    (let
+        ((root-tree-head (fibHeap-makeup-tree-head
+                          (fibHeap-node-calculate-rank root)
+                          root)
+                         ))
+      (let
+          ((forest (fibHeap-makeup-forest-notrees-with-max-rank
+                    (get-maximum-rank-from-tree-heads (fibHeap-tree-head-rank
+                                                       root-tree-head
+                                                       )
+                                                      childs-tree-head
+                                                      ))
+                   ))
+        (define (deal-with-root)
+          (set! forest
+                (place-tree-head-on-proper-pos root-tree-head
+                                               forest)
+                )
+          )
+        (define (deal-with-childs-tree-head childs)
+          (if (not (null? childs))
+              (map (lambda (child)
+                     (set! forest
+                           (place-tree-head-on-proper-pos
+                            child
+                            forest)
+                           )
+                     )
+                   childs)
+              )
+          )
+
+        (deal-with-root)
+        (deal-with-childs-tree-head childs-tree-head)
+        forest
+        )
+      )
+    )
+
+  (cond
+   ((eq? tree fibHeap-null-node)
+    fibHeap-null-forest
+    )
+   ((= node-key (fibHeap-node-key tree))
+    (cut-off-root tree)
+    )
+   (else
+    (cut-off-descendant tree)
+    )
+   )
+  )
+
+
 
 ;;  fibHeap-node-increase-lc-counter - increase lc-counter of node
 ;;  @node:                             the node to increase lc-counter
@@ -210,6 +579,15 @@
    (fibHeap-node-childs node)
    (+ (fibHeap-node-lc-counter node)
       1)
+   (fibHeap-node-r-bit node)
+   )
+  )
+
+(define (fibHeap-node-reset-lc-counter node)
+  (fibHeap-makeup-node
+   (fibHeap-node-key node)
+   (fibHeap-node-childs node)
+   fibHeap-node-lc-counter-init
    (fibHeap-node-r-bit node)
    )
   )
@@ -231,21 +609,57 @@
 (define (fibHeap-node-set-r-bit node)
   (fibHeap-node-modify-r-bit node fibHeap-node-r-bit-on)
   )
+
 (define (fibHeap-node-clear-r-bit node)
   (fibHeap-node-modify-r-bit node fibHeap-node-r-bit-off)
   )
    
-;;  fibHeap-is-node-haveto-be-cut? - is the node should to be
+;;  fibHeap-should-cascade-cut? - is the node should to be
 ;;                                   cut off?
 ;;  #  lc-counter = 2 AND !r-bit
 ;;     generally,when a node becomes root,its lc-counter
 ;;     would be reset to zero.                                 
-(define (fibHeap-is-node-haveto-be-cut? node)
+(define (fibHeap-node-should-cascade-cut? node)
   (and (= (fibHeap-node-lc-counter node)
           fibHeap-node-lc-counter-max)
        (not (fibHeap-node-r-bit node))
        )
   )
+
+;;  fibHeap-node-account-descendants - account the number of
+;;                                     descendants of a tree
+;;  @node:                             node as the root of
+;;                                     the tree
+;;  return:                            how many descendants exist
+;;
+;;  #  descendants of a node is equal to the sum of descendants
+;;     of its childs plus itself.
+(define (fibHeap-node-account-descendants node)
+  (define (traverse-all-to-account-descendants node result)
+    (if (null? node)
+        result
+        (+ 1 (sequence_sum 
+              (map (lambda (child) (traverse-all-to-account-descendants child 0))
+                  (fibHeap-node-childs node)
+                  )
+              )
+           )
+        )
+    )
+  (traverse-all-to-account-descendants node)
+  )
+
+;;  fibHeap-node-calculate-rank - calculate rank of the tree on root
+;;                                @node
+;;  @node:                        the node as the root
+;;  return:                       number of childs of the @node
+(define (fibHeap-node-calculate-rank node)
+  (sizeof_list (fibHeap-node-childs node))
+  )
+
+;;  rank is necessary for place the cut off tree in proper a tree-head.
+
+;;  OPERATIONS
 
 ;;  fibHeap-insert - fibonacci heap operation INSERT
 ;;  @key:            insert a new key into the @forest
@@ -307,15 +721,20 @@
 ;;  the environment bindings(interpreter feature)
 ;;  but such way will put all position records in
 ;;  single environment.
-(define (fibHeap-findout-a-node key forest))
+(define (fibHeap-findout-a-node key tree))
 
 ;;  fibHeap-DecreaseKey - decrease the key of @node
 ;;                        in @delta
-;;  @node:                the node contains the key
+;;  @forest:              forest contains the node
+;;  @node_key:            the node contains the key
 ;;                        to be decreased
+;;                        #  because we use the key
+;;                           to represent the node
+;;                           than specify a symbol
+;;                           as the identifier.
+;;
 ;;  @delta:               decrease value
-;;  return:               new node that the key
-;;                        had been decreased
+;;  return:               a new forest which is updated
 ;;  #  DecreaseKey may cause cutting off or
 ;;     cascade cutting,maybe several times.
 ;;
@@ -332,7 +751,8 @@
 ;;               lc-counter-max
 ;;             =>
 ;;               cascade cutting to (parent @v)
-(define (fibHeap-DecreaseKey node delta))
+(define (fibHeap-DecreaseKey forest node_key delta))
+  
 
 ;;  fibHeap-DeleteMin - delete the node contains a minimum
 ;;                      key in the forest
