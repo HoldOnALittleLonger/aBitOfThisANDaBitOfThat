@@ -26,61 +26,6 @@
 ;;  ceiling is a build-in procedure
 (define (ceiling-log-2 x) (ceiling (log-2 x)))
 
-
-;;  recursive-list-cond-op - make operation on a sequence
-;;                           in (cond) special form
-;;  @return-point-predicate?: recursive should end up there
-;;  @makeup-return-value-procedure:
-;;                           product what to return when recursive
-;;                           ends
-;;  @satisfy-condition-predicate?:
-;;                           how is the condition
-;;                           satisfied
-;;  @sc-op:                  what to do when
-;;                           condition satisfy
-;;  @else-progress-procedure:
-;;                           enter next recursive
-;;  @element:                pattern
-;;  @the-list:               list contains elements
-;;                           to match
-;;  return:                  what (@makeup-return-value-procedure)
-;;                           or (@sc-op),(@else-progress-procedure)
-;;                           to return
-;;  !!  when use this template,have to let
-;;      @else-progress-procedure call to
-;;      *this get to next stage if it is necessay.
-
-#|
-(define (recursive-sequence-with-cond-op
-         return-point-predicate?
-         makeup-return-value-procedure
-         satisfy-condition-predicate?
-         sc-op
-         else-progress-procedure
-         element
-         the-list)
-  (cond
-   ((return-point-predicate? element the-list)
-    (makeup-return-value-procedure
-     element
-     the-list)
-    )
-   ((satisfy-condition-predicate?
-     element
-     the-list)
-    (sc-op element the-list)
-    )
-   (else
-    (else-progress-procedure
-     element
-     the-list)
-    )
-   )
-  )
-
-|#
-
-
 ;;  traverse-sequence-with-cond-op - user-defined syntax used to traverse a
 ;;                                   list to do something on its element
 ;;                                   if condition is satisfied
@@ -152,16 +97,12 @@
     )
   )
 
-
-
-
 ;;  fibonacci heap
 
 ;;  FOREST
 
 ;;  fibHeap-null-forest - no tree-heads in forest
 (define fibHeap-null-forest '())
-  )
 
 ;;  fibHeap-forest - declare and initialize the Eva
 ;; 
@@ -532,45 +473,51 @@
 ;;                                   which breaks order
 ;;                                   NIL
 (define (fibHeap-node-tree-check-order tree)
-  (define (return-point-predicate? e l)
-    (eq? l fibHeap-null-node)
-    )
+  (define (routine p cs)
 
-  (define (return-value e l) fibHeap-null-node)
+    ;;  compare-all - compare parent to all childs
+    ;;  @e:           parent key
+    ;;  @l:           child list 
+    ;;  return:       NIL or broken node
+    (define (compare-all e l)
+      (if (null? l)
+          fibHeap-null-node
+          (if (> e (fibHeap-node-key (car l)))
+              (car l)
+              (compare-all e (cdr l))
+              )
+          )
+      )
 
-  (define (satisfy-condition-predicate? e l)
-    (> (fibHeap-node-key e)
-       (fibHeap-node-key (car l))
-       )
-    )
-
-  (define (sc-op e l)
-    (car l)
-    )
-
-  (define (else-progress e l)
     (let
-        ([ret (fibHeap-node-tree-check-order
-               (car l)
-               )
-              ]
+        ([retv (compare-all (fibHeap-node-key p)
+                            cs)
+               ]
          )
-      (if (eq? ret fibHeap-null-node)
-          (else-progress e (cdr))
-          ret
+      ;;  for-all-childs - call check order rountine
+      ;;                   on all childs
+      ;;  @cs:             child list
+      ;;  return:          NIL or broken node
+      (define (for-all-childs cs)
+        (if (eq? cs fibHeap-null-node)
+            fibHeap-null-node
+            (let
+                ([retv (fibHeap-node-tree-check-order (car cs))])
+              (if (eq? retv fibHeap-null-node)
+                  (for-all-childs (cdr cs))
+                  retv
+                  )
+              )
+            )
+        )
+      (if (eq? retv fibHeap-null-node)
+          (for-all-childs cs)
+          retv
           )
       )
     )
 
-  (recursive-list-cond-op
-   return-point-predicate?
-   return-value
-   satisfy-condition-predicate?
-   sc-op
-   else-progress
-   tree
-   (fibHeap-node-childs tree)
-   )
+  (routine tree (fibHeap-node-childs tree))
   )
 
 
