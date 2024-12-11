@@ -1,3 +1,8 @@
+#|
+ | There just a thinking about fibonacci heap in Scheme.
+ | I have not tried to run it once.
+ |#
+
 ;;  assist procedures
 
 (define sizeof-list length)
@@ -37,7 +42,7 @@
   (syntax-rules ()
     ((_
       retp? ret-op
-v      sc-p? sc-op
+      sc-p? sc-op
       constructor else-op
       next-e next-l
       e l
