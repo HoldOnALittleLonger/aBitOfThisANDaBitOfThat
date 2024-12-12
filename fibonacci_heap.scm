@@ -63,7 +63,7 @@
        )
       )
      )
-
+    
     ((_
       ret-p? ret-op
       constructor else-op
@@ -84,8 +84,6 @@
     )
   )
 
-(define tswcop traverse-sequence-with-cond-op)
-
 #|
  | until - user-defined syntax,loop until condition
  |         become TRUE
@@ -96,12 +94,14 @@
   (syntax-rules ()
     ((_ cond-p? to-do)
      (if (not (cond-p?))
-         (begin (to-do) (until cond-p? to-do))
+         (begin (to-do) (_ cond-p? to-do))
          )
      )
     )
   )
 
+(define (cons-constructor exp1 exp2) (cons exp1 exp2))
+(define (begin-constructor exp1 exp2) exp2)
 
 ;;  fibonacci heap
 
@@ -179,7 +179,7 @@
  | return:                      updated tree-head
  |#
 (define (fibHeap-forest-override-th th f)
-  (tswcop
+  (traverse-sequence-with-cond-op
    (lambda (e l) (eq? fibHeap-null-forest l))
    (lambda (e l) l)
    (lambda (e l) (= (fibHeap-tree-head-rank e)
@@ -253,7 +253,7 @@
  |                                               tree-head-placeholders
  |#
 (define (fibHeap-makeup-forest-notrees-with-max-rank rank)
-  (tswcop
+  (traverse-sequence-with-cond-op
    (lambda (e l) (= 0 l))
    (lambda (e l) (fibHeap-forest-insert
                   (fibHeap-tree-head-placeholder e)
@@ -306,7 +306,7 @@
  |      place @tree-head on correct position
  |#
 (define (fibHeap-forest-place-th tree-head forest)
-  (tswcop
+  (traverse-sequence-with-cond-op
    (lambda (e l) (= (fibHeap-tree-head-rank e)
                     (fibHeap-tree-head-rank
                      (fibHeap-forest-tree-head l)
@@ -399,8 +399,8 @@
           )
       tree-head
       (let
-          ([trees 
-            (tswcop
+          ((trees 
+            (traverse-sequence-with-cond-op
              (lambda (e l) (eq? l fibHeap-null-node))
              (lambda (e l) l)
              (lambda (e l) (= (fibHeap-node-key e)
@@ -408,14 +408,14 @@
                               )
                      )
              (lambda (e l) (cdr l))
-             cons
+             cons-constructor
              (lambda (e l) (car l))
              (lambda (e l) e)
              (lambda (e l) (cdr l))
              tree
              (fibHeap-tree-head-trees tree-head)
              )
-            ]
+            )
            )
         (fibHeap-makeup-tree-head
          (fibHeap-tree-head-rank tree-head)
@@ -486,9 +486,9 @@
             )
         trees
         (let*
-            ([first (car trees)]
-             [second (cadr trees)]
-             [new (fibHeap-node-link first second)]
+            ((first (car trees))
+             (second (cadr trees))
+             (new (fibHeap-node-link first second))
              )
           (routine (cons new (routine (cddr trees))))
           )
@@ -502,7 +502,7 @@
                           )
              )
           (let
-              ([new-tree-list (routine (fibHeap-tree-head-trees th))])
+              ((new-tree-list (routine (fibHeap-tree-head-trees th))))
             (fibHeap-makeup-tree-head
              (fibHeap-node-calculate-rank (car new-tree-list))
              new-tree-list
@@ -511,13 +511,13 @@
           (begin
             (set! the-one (car (fibHeap-tree-head-trees th)))
             (let
-                ([new-tree-list
+                ((new-tree-list
                   (routine (fibHeap-tree-head-trees
                             (fibHeap-tree-head-unlink-tree the-one
                                                            th)
                             )
                            )
-                  ]
+                  )
                  )
               (fibHeap-tree-head-insert 
                the-one
@@ -618,9 +618,9 @@
       )
 
     (let
-        ([retv (compare-all (fibHeap-node-key p)
+        ((retv (compare-all (fibHeap-node-key p)
                             cs)
-               ]
+               )
          )
       #| 
        | for-all-childs - call check order rountine
@@ -632,7 +632,7 @@
         (if (eq? cs fibHeap-null-node)
             fibHeap-null-node
             (let
-                ([retv (fibHeap-node-tree-check-order (car cs))])
+                ((retv (fibHeap-node-tree-check-order (car cs))))
               (if (eq? retv fibHeap-null-node)
                   (for-all-childs (cdr cs))
                   retv
@@ -654,10 +654,10 @@
 ;;  fibHeap-node
 (define (fibHeap-node-DecreaseKey node delta tree)
   (define (for-all-childs node childs)
-    (tswcop
+    (traverse-sequence-with-cond-op
      (lambda (e l) (eq? l fibHeap-null-node))
      (lambda (e l) l)
-     cons
+     cons-constructor
      (lambda (e l) (fibHeap-node-DecreaseKey
                     e
                     delta
@@ -700,13 +700,13 @@
  |                              #t => exist
  |#
 (define (fibHeap-node-is-key-exist? key root)
-  (tswcop
+  (traverse-sequence-with-cond-op
    (lambda (e l) (eq? fibHeap-null-node l))
    (lambda (e l) #f)
    (lambda (e l) (= e (fibHeap-node-key l)))
    (lambda (e l) #t)
    or
-   (lambda (e l) (tswcop
+   (lambda (e l) (traverse-sequence-with-cond-op
                   (lambda (e l) (eq? fibHeap-null-node
                                      (fibHeap-node-childs l)
                                      )
@@ -773,7 +773,7 @@
      |                 to return
      |#
     (define (enter-childs childs)
-      (tswcop
+      (traverse-sequence-with-cond-op
        (lambda (e l) (eq? fibHeap-null-node l))
        (lambda (e l) fibHeap-null-forest)
        fibHeap-merge
@@ -807,13 +807,13 @@
      | #  should call to this procedure after (check-childs) returned #t
      |#
     (define (find-from-childs key childs)
-      (tswcop
+      (traverse-sequence-with-cond-op
        (lambda (e l) (and (not (eq? l fibHeap-null-node))
                           (= e (fibHeap-node-key (car l)))
                           )
                )
        (lambda (e l) (car l))
-       begin
+       begin-constructor
        (lambda (e l) fibHeap-null-node)
        (lambda (e l) e)
        (lambda (e l) (cdr l))
@@ -830,13 +830,13 @@
      | return:                updated child list
      |#
     (define (unlink-X-from-childs X childs)
-      (tswcop
+      (traverse-sequence-with-cond-op
        (lambda (e l) (eq? fibHeap-null-node l))
        (lambda (e l) fibHeap-null-node)
 
        (lambda (e l) (= X (fibHeap-node-key (car l))))
        (lambda (e l) (cdr l))
-       cons
+       cons-constructor
        (lambda (e l) (car l))
        (lambda (e l) e)
        (lambda (e l) (cdr l))
@@ -846,22 +846,22 @@
       )
 
     (let
-        ([childs (fibHeap-node-childs parent)])
+        ((childs (fibHeap-node-childs parent)))
       (if (not (check-childs childs))
           (enter-childs childs)
           (let*
-              ([node (find-from-childs node-key childs)]  ;;  X
-               [new-childs (unlink-X-from-childs node childs)]
-               [the-parent parent]
-               [node-tree-head (fibHeap-makeup-tree-head
+              ((node (find-from-childs node-key childs))  ;;  X
+               (new-childs (unlink-X-from-childs node childs))
+               (the-parent parent)
+               (node-tree-head (fibHeap-makeup-tree-head
                                 (fibHeap-node-calculate-rank node)
                                 node)
-                               ]
-               [node-forest
+                               )
+               (node-forest
                 (fibHeap-forest-place-th node-tree-head
                                          fibHeap-null-forest)
-                ]
-               [updated-parent
+                )
+               (updated-parent
                 (fibHeap-node-increase-lc-counter
                  (fibHeap-makeup-node
                   (fibHeap-node-key the-parent)
@@ -870,7 +870,7 @@
                   (fibHeap-node-r-bit the-parent)
                   )
                  )
-                ]
+                )
                )
             (if (fibHeap-node-should-cascade-cut-off? updated-parent)
                 (fibHeap-merge
@@ -880,11 +880,11 @@
                   tree)
                  )
                 (let
-                    ([tree-tree-head 
+                    ((tree-tree-head 
                       (fibHeap-makeup-tree-head
                        (fibHeap-node-calculate-rank tree)
                        tree)
-                      ]
+                      )
                      )
                   (fibHeap-merge node-forest
                                  (fibHeap-forest-place-th
@@ -918,10 +918,10 @@
      | return:                            @current
      |#
     (define (get-maximum-rank-from-tree-heads current sequence)
-      (tswcop
+      (traverse-sequence-with-cond-op
        (lambda (e l) (null? sequence))
        (lambda (e l) e)
-       begin
+       begin-constructor
        (lambda (e l) 0)
        (lambda (e l) (if (> e (fibHeap-tree-head-rank (car l)))
                          e
@@ -970,12 +970,12 @@
       )
 
     (let
-        ([root-tree-head (fibHeap-makeup-tree-head
+        ((root-tree-head (fibHeap-makeup-tree-head
                           (fibHeap-node-calculate-rank root)
                           root)
-                         ]
+                         )
 
-         [forest 
+         (forest 
           (fibHeap-forest-extend
            (get-maximum-rank-from-tree-heads
             (fibHeap-tree-head-rank root-tree-head)
@@ -983,7 +983,7 @@
             )
            fibHeap-null-forest
            )
-          ]
+          )
          )
 
       (define (deal-with-root)
@@ -1251,12 +1251,12 @@
        (let
            ((current-th (fibHeap-forest-tree-head forest)))
          (define (traverse-trees key trees)
-           (tswcop
+           (traverse-sequence-with-cond-op
             (lambda (e l) (eq? l fibHeap-null-node))
             (lambda (e l) fibHeap-null-node)
             (lambda (e l) (fibHeap-node-is-key-exist? e (car l)))
             (lambda (e l) (car l))
-            cons
+            cons-constructor
             (lambda (e l) (car l))
             (lambda (e l) e)
             (lambda (e l) (cdr l))
@@ -1265,10 +1265,10 @@
             )
            )
          (let
-             ([t (traverse-trees 
+             ((t (traverse-trees 
                   (fibHeap-node-key node)
                   (fibHeap-tree-head-trees current-th))
-                 ]
+                 )
               )
            (if (eq? t fibHeap-null-node)
                (find-out-the-tree-from-forest (fibHeap-forest-rest forest))
@@ -1285,19 +1285,19 @@
   ;;  created by decreaseKey.
 
   (let
-      ([tree (find-out-tree-from-forest forest)])
+      ((tree (find-out-tree-from-forest forest)))
     (if (eq? fibHeap-null-node tree)
         forest  ;;  we failed to find out such tree in forest.
         (let*
-            ([tree-head 
+            ((tree-head 
               (fibHeap-forest-retrieve-specified-th
                forest
                (fibHeap-node-calculate-rank tree)
                )
-              ]
-             [updated-th (fibHeap-tree-head-unlink-tree tree tree-head)]
-             [new-tree (fibHeap-node-DecreaseKey node delta tree)]
-             [broken-node (fibHeap-node-tree-check-order new-tree)]
+              )
+             (updated-th (fibHeap-tree-head-unlink-tree tree tree-head))
+             (new-tree (fibHeap-node-DecreaseKey node delta tree))
+             (broken-node (fibHeap-node-tree-check-order new-tree))
              )
           (if (eq? broken-node fibHeap-null-node)
               (fibHeap-forest-place-th 
@@ -1307,7 +1307,7 @@
                 new-tree)
                )
               (let
-                  ([updated-forest (fibHeap-forest-override-th forest updated-th)])
+                  ((updated-forest (fibHeap-forest-override-th forest updated-th)))
                 (fibHeap-merge updated-forest
                                (fibHeap-node-cascade-cut-off
                                 broken-node
@@ -1351,10 +1351,10 @@
    |                               elements.
    |#
   (define (traverse-roots-find-minimum current-min roots)
-    (tswcop
+    (traverse-sequence-with-cond-op
      (lambda (e l) (eq? l fibHeap-null-node))
      (lambda (e l) e)
-     begin
+     begin-constructor
      (lambda (e l) (car l))
      (lambda (e l) (if (> (fibHeap-node-key e)
                           (fibHeap-node-key (car l)))
@@ -1376,14 +1376,14 @@
       (if (eq? fibHeap-null-forest f)
           current-min
           (let
-              ([min-root (traverse-roots-find-minimum
+              ((min-root (traverse-roots-find-minimum
                           current-min
                           (fibHeap-tree-head-trees
                            (fibHeap-forest-tree-head
                             f)
                            )
                           )
-                         ]
+                         )
                )
             (routine min-root (fibHeap-forest-rest f))
             )
@@ -1410,14 +1410,14 @@
             ;;  procedure (fibHeap-tree-head-merge-trees) merges
             ;;  the trees under a tree-head and produce a new
             ;;  tree-head which had been merged.
-            ([new-th (fibHeap-tree-head-merge-trees
+            ((new-th (fibHeap-tree-head-merge-trees
                       (fibHeap-forest-tree-head the-forest)
                       )
-                     ]
+                     )
              ;;  if @second-tree is not equal to NIL
              ;;  then the @first-tree must be the one 
-             [first-tree (car (fibHeap-tree-head-trees new-th))]
-             [second-tree (cadr (fibHeap-tree-head-trees new-th))]
+             (first-tree (car (fibHeap-tree-head-trees new-th)))
+             (second-tree (cadr (fibHeap-tree-head-trees new-th)))
              )
           (if (eq? second-tree fibHeap-null-node)
               (set! temp-forest
@@ -1426,22 +1426,23 @@
                      temp-forest)
                     )
               (let
-                  ([updated-new-th (fibHeap-tree-head-unlink-tree
+                  ((updated-new-th (fibHeap-tree-head-unlink-tree
                                     first-tree
                                     new-th)
-                                   ]
-                   [first-th (fibHeap-tree-head-insert
+                                   )
+                   (first-th (fibHeap-tree-head-insert
                               first-tree
                               (fibHeap-tree-head-placeholder
                                (fibHeap-node-calculate-rank 
                                 first-tree)
                                )
                               )
-                             ]
+                             )
                    )
                 (set! temp-forest
                       (fibHeap-forest-place-th
                        updated-new-th
+                       temp-forest
                        ))
                 (set! temp-forest
                       (fibHeap-forest-place-th
@@ -1463,7 +1464,7 @@
    |    in it holding zero or one tree.
    |#
   (define (is-merging-finished? f)
-    (tswcop
+    (traverse-sequence-with-cond-op
      (lambda (e l) (eq? l fibHeap-null-forest))
      (lambda (e l) #t)
      and
@@ -1498,15 +1499,54 @@
   (if (eq? fibHeap-null-forest forest)
       (cons fibHeap-null-node fibHeap-null-forest)
       (let*
-          ([min-root (traverse-tree-heads-find-minimum forest)]
-           [mr-th (fibHeap-forest-retrieve-specified-th
+          ((min-root (traverse-tree-heads-find-minimum forest))
+           (mr-th (fibHeap-forest-retrieve-specified-th
                    forest
                    (fibHeap-node-calculate-rank min-root))
-                  ]
-           [updated-th (fibHeap-tree-head-unlink-tree min-root mr-th)]
-           [updated-forest (fibHeap-forest-override-th updated-th forest)]
+                  )
+           (updated-th (fibHeap-tree-head-unlink-tree min-root mr-th))
+           (updated-forest (fibHeap-forest-override-th updated-th forest))
+
+           ;; we have got the root,then make a list of childs and place them into
+           ;; forest.
+           (mr-childs-th-list 
+            (traverse-sequence-with-cond-op
+             (lambda (e l) (eq? fibHeap-null-node l))
+             (lambda (e l) '())
+             cons-constructor
+             (lambda (e l) (fibHeap-makeup-tree-head
+                            (fibHeap-node-calculate-rank (car l))
+                            (car l))
+                     )
+             (lambda (e l) e)
+             (lambda (e l) (cdr l))
+             fibHeap-null-node
+             (fibHeap-node-childs min-root)
+             )
+            )
            )
-        (set-car! final-result min-root)
+        #|
+         | DeleteMin is different to cascade cut off.
+         | after the root contains a minimum key in the forest is found out.
+         | DeleteMin remove the root from forest and returns its key.
+         | but before returning,DeleteMin have to place the childs of the
+         | root into forest,then merge forest.
+         |#
+
+        ;; place all tree-heads into @updated-forest.
+        (until
+         (lambda () (eq? mr-childs-th-list '()))
+         (lambda ()
+           (set! updated-forest
+                 (fibHeap-forest-place-th (car mr-childs-th-list)
+                                          updated-forest)
+                 )
+           (set! mr-childs-th-list
+                 (cdr mr-childs-th-list))
+           )
+         )
+
+        (set-car! final-result (fibHeap-node-key min-root))
         (set! temp-forest updated-forest)
         (until (lambda () (is-merging-finished? temp-forest))
                (lambda () (real-merge temp-forest))
