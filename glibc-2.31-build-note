@@ -1,0 +1,49 @@
+Record for the time when I building glibc-2.31
+
+Compiler      :  gcc 10.3.0
+Libc          :  glibc-2.17
+Machine       :  Laptop
+Architecture  :  x86_64
+
+!!  Before update glibc,best to update system once through package manager.
+!!  Update glibc is more dangerous than switch a kernel.
+
+What I did :
+        1> mkdir under glibc source tree.
+        2> chdir to new directory.
+        3> shell process :
+                   ../configure CFLAGS="-O2 -fPIC" --prefix=/usr --enable-add-ons \
+                   --enable-stackguard-randomization --enable-stack-protector=strong \
+                   --disable-profile --enable-kernel=5.4.32 --enable-shared \
+                   --enable-obsolete-nsl
+           /**
+            * --enable-obsolete-nsl => Compile all nsl related components for compatible
+            *                          to the old system.Better enable this,otherwise,
+            *                          may throw error during compiling.
+            * --enable-kernel       => Optimize to Kernel 5.4.32.
+            *                          This request current Kernelis Linux 5.4.32.
+            *                          -> Compile Kernel
+            *                          -> Install Kernel
+            *                          -> Boot the new Kernel
+            *                          -> Compile glibc
+            */
+         4> make
+         5> Modify script "scripts/test-installtion.pl" under glibc source code tree.
+            Add no "nss_test2" checking :
+                    start at line emacs : line number 126
+
+                    if branch :
+                            ...
+                            && $name ne "thread_db"
+                            && $name ne "nss_test2"     <= This is what have to add
+                            && $name ne "nss_test1" && $name ne "libgcc_s") {
+                            ...
+
+            This will prevent an error occurs(... GLIBC@PRIVATE ...) during installation.
+         6> make check
+            make install
+         7> check if system is no problem occurred
+            do
+                    make localedata/install-locales
+         8> END
+

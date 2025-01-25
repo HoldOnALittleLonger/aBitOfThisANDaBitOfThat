@@ -1,0 +1,109 @@
+Record for the time when I building Linux Kernel 5.4.32
+
+Compiler      :  gcc 10.3.0
+Libc          :  glibc-2.17
+Machine       :  Laptop
+Architecture  :  x86_64
+
+Reason :
+        Silence people,I dont want to bear 3.10 anymore,Ijust want to update my machine.
+        /**
+         * Reason is simple,just want change.
+         * Everything will change along with the time passing.
+         */
+
+Prepare :
+        It is not many works have to do,just some tools are useful to compile Kernel.
+        Everything is decribed in Kernel documents.
+
+Kbuild :
+        I configure Kernel in "menuconfig" through the Makefile under the Source Tree.
+        But i can not recognize all things in the Kernel configuring,because they are
+        related some hardware knowledge.
+
+        Laptop Touchpad :
+                Finally,I succeed to drive it work.Through the Kernel driver "psmouse",
+                which is managed by "CONFIG_MOUSE_PS2",and compile it as a module.
+                X11 Server succeed to take a communication with it.
+                Before this,I tried "synaptics_usb", "synaptics_i2c", "i2c_hid", and
+                "uhid" all are failed.
+                /* spent a lot of time!!! */
+
+        Wifi Module :
+                The machine come with Intel wireless device in model 3168.
+                I compiled it into Kernel,but it seemed useless,network interface
+                did not appear for the command "ip a".Compile it as a module solved
+                this problem.
+
+        Soundcard :
+                Because checked some bluetooth related device drivers in Kernel
+                config.It is work well for my bluetooth-headphone.
+                ALSA is compiled into Kernel,no thing is trouble,except the
+                local soundcard.
+                Its model is Intel HD Audio,so I checked to compile the correspond
+                device driver into Kernel.That is the problem.
+                Solved this in the way compile ALSA, HDA both as a module.And bluetooth
+                is stay work well.
+
+        Keyboard and Mouse :
+                No thing have to describe,compile both them into Kernel just well.
+
+        NSA Selinux :
+                ==================================================================
+                        NSA Selinux : "....."
+                ==================================================================
+                        January 25th 16:04
+                ==================================================================
+                        NSA Selinux : "Hey user."
+                                      "The day you use the system roughly has over."
+                                      "Check the NSA Selinux Option."
+
+                                 Me : "If you want it,then you have to check it by
+                                       yourself."
+                                      "You have known that."
+                ==================================================================
+                        .....
+                ==================================================================
+                
+                Just simple,If you want it,then you have to check it by yourself.
+                /* But I refuse to. */
+
+        Kernel Panic :
+                Yes,it has been encountered.
+
+                => start_secondary() /* the smpboot to boot rest */
+                   -> unsynchronized
+                => The problem is gcc 10.3.0.
+                   When you enabled stack protector,this problem will be there.
+                => Solved it by use the CFLAGS_KERNEL variable.
+                           => make ARCH=x86_64 CFLAGS_KERNEL="-fno-stack-protector"
+                
+                Use the corresponding gcc attribute for start_secondary() is useless.
+                But have to be aware,that CFLAGS_KERNEL involve to all built-in Kernel
+                Code.
+
+Install :
+        Just do 
+                /* install headers */
+                make INSTALL_HDR_PATH=<the path where headers you want to install> headers_install
+
+                /* install modules */
+                make INSTALL_MOD_PATH=<where the modules to place> modules_install
+
+                /* install kernel */
+                make install
+
+        Do not to modify bootloader and makeup an initramfs file for the kernel.
+
+Insmod during booting :
+        Use the config directory "/etc/modules-load.d".
+        Modules listed in the config file such "example.conf" under the directory are
+        installed automatically during system booting.
+        /**
+         * This is the systemd feature.
+         * systemd is integred into Linux Kernel have past a long time,as the alternative to
+         * init(SystemV).
+         */
+                     
+
+
