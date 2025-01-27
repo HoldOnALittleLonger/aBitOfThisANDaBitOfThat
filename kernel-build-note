@@ -71,6 +71,7 @@ Kbuild :
         Kernel Panic :
                 Yes,it has been encountered.
 
+                ==================================================================
                 => start_secondary() /* the smpboot to boot rest */
                    -> unsynchronized
                 => The problem is gcc 10.3.0.
@@ -81,6 +82,60 @@ Kbuild :
                 Use the corresponding gcc attribute for start_secondary() is useless.
                 But have to be aware,that CFLAGS_KERNEL involve to all built-in Kernel
                 Code.
+                ==================================================================
+
+                ==================================================================
+                => VFS: Unable to mount root fs on unknown-block (0,0)
+                        dump_kernel
+                        panic
+                        mount_block_root
+                        prepare_namespace       <= defined in <init/do_mounts.c>
+                        rest_init               <= called by start_kernel()
+
+                        if @ROOT_DEV is not MTD or UBI,then just call to
+                        mount_block_root().
+                        else call to initrd_load().
+                        if @ROOT_DEV is not MTD or UBI and load initrd failed,
+                        then call to mount_root();if @ROOTDEV is a floppy deive,
+                        change @ROOT_DEV to @Root_RAM0 before function calling.
+
+                        panic() called from mount_block_root().the main routine
+                        does rootfs mounting is do_mount_root().
+                        mount_block_root() traverse all possible filesystem names
+                        and use the name call to do_mount_root().
+                        if current filesystem failed to mount,and return value
+                        is not amomh {0 | -EACCESS | -EINVAL},then kernel panic,
+                        it is failed to mount "this" filesystem.
+                        of course,kernel panic if all filesystems' mounting are
+                        failed.
+
+                        function __bdevname() used to convert @ROOT_DEV to C-style
+                        string such (major,minor).            /* u32 */
+
+                        !!  on my computer,the disk device has major 8,but VFS
+                            reported (0,0),it turns out there is no an appropriate
+                            disk device controller for these disks.
+                            it must be disabled when I configuring the Linux Kernel.
+                            /**
+                             * My real root / is based LVM.But I enabled device mapper
+                             * for the kernel.
+                             * Maybe I disabled a sub-config-option of SCSI which is
+                             * involved to a disk device controller for my computer.
+                             *
+                             * If LVM is not loaded correctly,then the filesystem on
+                             * the Logic Volume also cannot be recognized what it is.
+                             * For that,I required "dracut" contains LVM module when
+                             * make an initramfs image.
+                             * # grub can insmod "lvm" too,before process "linux <kernel>"
+                             *   command.
+                             */
+                => Solved by reconfigure the Kernel based on x86_64 defconf,and adjust
+                   somethings.
+                           make ARCH=x86_64 defconfig
+                           /* then configure kernel again */
+                           make menuconfig
+                        
+                ==================================================================
 
 Install :
         Just do 
