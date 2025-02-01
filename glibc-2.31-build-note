@@ -47,3 +47,47 @@ What I did :
                     make localedata/install-locales
          8> END
 
+Remove glibc rpm package before :
+        !! must compiled glibc at first.
+        
+        1> open several terminals at first.
+        2> remove glibc.x86_64 or glibc.i686  /* Distribution depends */
+        3> after accomplished removing,almost all terminal commands
+           are available,but some shell built-in commands are still
+           work.
+           glibc-build-directory :
+             build-dir {
+                     libc.so
+             }
+
+             elf {
+                     ld-linux-x86-64.so.2
+                     sln /* static linkage */
+             }
+
+             nptl {
+                     libpthread.so
+             }
+
+             dlfcn {
+                     libdl.so
+             }
+
+        4> export some environment variables :
+             export LD_LIBRARY_PATH=$(pwd):$(pwd)/nptl:$(pwd)/dlfcn:$LD_LIBRARY_PATH
+             export LD_PRELOAD=$(pwd)/libc.so
+
+           makeup symbolic link :
+             elf/sln $(pwd)/elf/ld-linux-x86-64.so.2 /usr/lib64/ld-linux-x86-64.so.2
+            
+        5> make install
+           /**
+            * Finally,"make" command will report an error about "libc.so".
+            * "chvt" to another terminal where no LD_PRELOAD exported,then goto
+            * build-dir and "make install" again.
+            */
+
+        !! inconsistence is because the new "libc.so" have not been loaded.
+           no ld-linux-x86-64.so.2 is because dynamic linker unfound,even exported
+           LD_PRELOAD or LD_LIBRARY_PATH,where to find out dynamic linker is defined
+           during program compile time.
