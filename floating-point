@@ -1,0 +1,35 @@
+Then encode of floating-point is defined by IEEE-754 standard.
+
+For float type 32 bits :
+        struct float {
+                unsigned sign:1;
+                unsigned exponent:8;
+                unsigned mantissa:23;
+        }; /* 32 bits, 4 bytes */
+
+        base value range : [1.0, 2.0)
+        e.g.
+          -5.0 == -1.25 * 2^2
+          2.0 == 1.0 * 2^1
+          1.0 == 1.0 * 2^0
+
+        +----------------------------+
+        | sign | exponent | mantissa |
+        +----------------------------+
+          |      |          |
+          |      |          +--> 23 bits mantissa
+          |      +--> 8 bit exponent
+          |           minimum : 00000001 => +1
+          |           maximum : 11111111 => -1 /* used for encode special values */
+          |           zero    : 00000000 => 0  /* used for encode special values */
+          +--> 0 => positive
+               1 => negative
+
+        Special Values :
+                [0 / 1, 0, 0] => +0 / -0
+
+                [0 / 1, 11111111, 0] => +infinity / -infinity
+        
+                [0 / 1, 11111111, not 0] => Not a Number
+                
+                [0 / 1, 0, not 0] => Denormalize numbers
