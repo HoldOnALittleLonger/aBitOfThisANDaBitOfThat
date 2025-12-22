@@ -52,6 +52,7 @@ WIFICONN_EC_WPA_OFFNET=25
 WIFICONN_EC_WPA_GETID=26
 
 WIFICONN_EC_BADCMD=32
+WIFICONN_EC_BADPARM=31
 
 WIFICONN_EC_NORMAL=127
 
@@ -110,6 +111,9 @@ function perror()
                 ;;
             $WIFICONN_EC_BADCMD)
                 errmsg="Bad usage"
+                ;;
+            $WIFICONN_EC_BADPARM)
+                errmsg="Invalid function parameter"
                 ;;
         esac
     else
@@ -350,14 +354,20 @@ function wifi_associate_common()
     fi
     
     ret=0
-    if [ $nopsk ]
-    then
-        wpa_cli_set_psk $network_id
-        ret=$?
-    else
-        wpa_cli_set_psk $network_id $current_psk
-        ret=$?
-    fi
+    case $nopsk in 
+        0)
+            wpa_cli_set_psk $network_id $current_psk
+            ret=$?
+            ;;
+        1)
+            wpa_cli_set_psk $network_id
+            ret=$?
+            ;;
+        *)
+            perror $WIFICONN_EC_BADPARM "wifi_associate_common"
+            ret=$WIFICONN_EC_NORMAL
+            ;;
+    esac
 
     if [ $ret -ne 0 ]
     then
@@ -643,7 +653,6 @@ function main()
 
     return $ret
 }
-
 
 main $@
 
