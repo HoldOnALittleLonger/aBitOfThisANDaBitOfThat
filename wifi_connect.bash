@@ -108,9 +108,6 @@ function perror()
             $WIFICONN_EC_WPA_GETID)
                 errmsg="Failed to get network id"
                 ;;
-            $WIFICONN_EC_WPA_SETIF)
-                errmsg="Failed to select interface"
-                ;;
             $WIFICONN_EC_BADCMD)
                 errmsg="Bad usage"
                 ;;
@@ -332,15 +329,11 @@ function wpa_remove_network()
     return 0
 }
 
-##
-# wifi_associate_to_ssid_nopsk - associate interface with a wlan without psk,
-#                                and enable the network if succeed
-# $1:                            ssid
-# return:                        0 OR $WIFICONN_EC_NORMAL
-##
-function wifi_associate_to_ssid_nopsk()
+function wifi_associate_common()
 {
     ssid=$1
+    nopsk=$2
+
     wpa_add_network
     network_id=$?
     if [ $network_id -eq $WIFICONN_EC_NORMAL ]
@@ -352,57 +345,56 @@ function wifi_associate_to_ssid_nopsk()
     if [ $? -ne 0 ]
     then
         perror $WIFICONN_EC_WPA_SETSSID $ssid
+        wpa_remove_network $network_id
         return $WIFICONN_EC_NORMAL
     fi
-
-    wpa_cli_set_psk $network_id
-    if [ $? -ne 0 ]
+    
+    ret=0
+    if [ $nopsk ]
     then
-        return $WIFICONN_EC_NORMAL
+        wpa_cli_set_psk $network_id
+        ret=$?
+    else
+        wpa_cli_set_psk $network_id $current_psk
+        ret=$?
+    fi
+
+    if [ $ret -ne 0 ]
+    then
+        wpa_remove_network $network_id
+        return $ret
     fi
 
     wpa_cli -i $wifi_if enable_network $network_id
     if [ $? -ne 0 ]
     then
         perror $WIFICONN_EC_WPA_ONNET $ssid
+        wpa_remove_network $network_id
         return $WIFICONN_EC_NORMAL
     fi
+
     return 0
+}
+
+##
+# wifi_associate_to_ssid_nopsk - associate interface with a wlan without psk,
+#                                and enable the network if succeed
+# $1:                            ssid
+# return:                        0 OR $WIFICONN_EC_NORMAL
+##
+function wifi_associate_to_ssid_nopsk()
+{
+    ssid=$1
+    wifi_associate_common $ssid 1
+    return $?
 }
 
 ## wifi_associate_to_ssid - have psk version ##
 function wifi_associate_to_ssid()
 {
     ssid=$1
-
-    wpa_add_network
-    network_id=$?
-    if [ $network_id -eq $WIFICONN_EC_NORMAL ]
-    then
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    wpa_cli -i $wifi_if set_network $network_id ssid \"$ssid\"
-    if [ $? -ne 0 ]
-    then
-        perror $WIFICONN_EC_WPA_SETSSID $ssid
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    wpa_cli_set_psk $network_id $current_psk
-    if [ $? -ne 0 ]
-    then
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    wpa_cli -i $wifi_if enable_network $network_id
-    if [ $? -ne 0 ]
-    then
-        perror $WIFICONN_EC_WPA_ONNET $ssid
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    return 0
+    wifi_associate_common $ssid 0
+    return $?
 }
 
 ## reset_all - just reset everything ##
@@ -440,7 +432,7 @@ function disable_ARE_pcireport()
     # PCI_EXP_AER_FLAGS PCI_EXP_DEVCTL_CERE(1) | PCI_EXP_DEVCTL_NFERE(2) |
     #                   PCI_EXP_DEVCTL_FERE(4) | PCI_EXP_DEVCTL_URRE(8)
     setpci -v -d 8086:a114 CAP_EXP+0x08.w=0x000e
-    return 0
+    return 0     #^information get by 'lshw' command
 }
 
 ## dhclient control ##
@@ -472,11 +464,6 @@ function wifi_up()
         return $WIFICONN_EC_NORMAL
     fi
 
-    if [ $? -ne 0 ]
-    then
-        perror $WIFICONN_EC_WPA_SETIF $wifi_if
-        return $WIFICONN_EC_NORMAL
-    fi
     return 0
 }
 
@@ -505,36 +492,43 @@ function wifi_scan()
     return 0
 }
 
-function wifi_connect()
+function wifi_connect_common()
 {
-    echo $1
     ssid=$1
-    makeup_passphrase_for_ssid $ssid
     get_passphrase_of_ssid $ssid
     ret=$?
-    if [ $ret -ne 0 ]
+    if [ $ret -eq $WIFICONN_SSID_NOPSK ]
     then
-        if [ $ret -eq WIFICONN_SSID_NOPSK ]
-        then
-            wifi_associate_to_ssid_nopsk $ssid
-            ret=$?
-        fi
-        return $ret
+        wifi_associate_to_ssid_nopsk $ssid
+        ret=$?
+    elif [ $ret -eq 0 ]
+    then
+        wifi_associate_to_ssid $ssid
+        ret=$?
     fi
-      
-    wifi_associate_to_ssid $ssid
-    ret=$?
+
     if [ $ret -ne 0 ]
     then
         return $WIFICONN_EC_NORMAL
     fi
 
-    echo $ssid > $wifi_LRU
-    
     dhcp_off
     dhcp_on
 
     return $ret
+}
+
+function wifi_connect()
+{
+    ssid=$1
+    makeup_passphrase_for_ssid $ssid
+    wifi_connect_common $ssid
+    if [ $? -eq 0 ]
+    then
+        echo $ssid > $wifi_LRU
+        return 0
+    fi
+    return $WIFICONN_EC_NORMAL
 }
 
 function wifi_disconnect()
@@ -554,30 +548,8 @@ function wifi_disconnect()
 function wifi_quick_connect()
 {
     ssid=$(cat $wifi_LRU)
-    get_passphrase_of_ssid $ssid
-    ret=$?
-    if [ $ret -eq $WIFICONN_SSID_NOPSK ]
-    then
-        wifi_associate_to_ssid_nopsk $ssid
-        if [ $? -ne 0 ]
-        then
-            return $WIFICONN_EC_NORMAL
-        fi
-    elif [ $ret -ne 0 ]
-    then
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    wifi_associate_to_ssid $ssid
-    if [ $? -ne 0 ]
-    then
-        return $WIFICONN_EC_NORMAL
-    fi
-
-    dhcp_off
-    dhcp_on
-
-    return 0
+    wifi_connect_common $ssid
+    return $?
 }
 
 function wifi_status()
