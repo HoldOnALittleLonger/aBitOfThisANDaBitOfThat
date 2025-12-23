@@ -137,10 +137,10 @@ function perror()
 ##
 function start_wpa_supplicant()
 {
-    wpas_pid=$(pgrep wpa_supplicant)
+    pgrep wpa_supplicant > /dev/null 2>&1
     if [ $? -ne 0 ]
     then
-        wpa_supplicant -i $wifi_if -B -c $wpa_original_config
+        wpa_supplicant -B -i $wifi_if -c $wpa_original_config
         if [ $? -ne 0 ]
         then
             perror $WIFICONN_EC_WPA_DAEMON
@@ -594,6 +594,7 @@ function main()
     if [ $# -lt 2 ]
     then
         perror $WIFICONN_EC_BADCMD
+        wifi_help
         return $WIFICONN_EC_NORMAL
     fi
 
@@ -648,6 +649,7 @@ function main()
         *)
             perror $WIFICONN_EC_BADCMD $cmd
             ret=$WIFICONN_EC_NORMAL
+            wifi_help
             ;;
     esac
 
