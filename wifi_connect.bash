@@ -24,6 +24,11 @@ wifi_scan_results=/tmp/802.11-scan-results
 # directory in which wlan config is placed
 wpa_config_dir=/etc/wpa_supplicant/wlans
 
+# log file : used by wpa_supplicant output message
+# pid file : record pid of wpa_supplicant daemon
+wpa_log_file=/var/log/wpa_supplicant.log
+wpa_pid_file=/var/run/wpa_supplicant.pid
+
 wifi_LRU=$wpa_config_dir/last_recently_used
 
 # path of wpa config,this file is created when the first time
@@ -134,13 +139,21 @@ function perror()
 # start_wpa_supplicant - start wpa_supplicant daemon
 # return:                0 => succeed OR $WIFICONN_EC_NORMAL => failed
 # @ if the daemon is running,this function would not touch it
+# @ maybe systemd start wpa_supplicant in system.slice,in this case,
+#   this function will returned without restart wpa_supplicant daemon
+#   with the specified interface,user have to set INTERFACE environment
+#   in systemd let wpa_supplicant start and listen on correct interface
+#   ! Environment variables in systemd config Environment may be overrided
+#     by Environment variables from the file that specified by EnvironmentFile
+#     in the systemd config
 ##
 function start_wpa_supplicant()
 {
     pgrep wpa_supplicant > /dev/null 2>&1
     if [ $? -ne 0 ]
     then
-        wpa_supplicant -B -i $wifi_if -c $wpa_original_config
+        wpa_supplicant -B -u -i $wifi_if -c $wpa_original_config \
+                       -f $wpa_log_file -P $wpa_pid_file
         if [ $? -ne 0 ]
         then
             perror $WIFICONN_EC_WPA_DAEMON
