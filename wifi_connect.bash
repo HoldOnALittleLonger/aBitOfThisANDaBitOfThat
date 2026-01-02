@@ -9,7 +9,7 @@
 #                scan_results
 #                connect <SSID>
 #                disconnect
-#                quick_connect <SSID>
+#                quick_connect
 #                status
 #                reset
 #                help
@@ -544,7 +544,32 @@ function wifi_connect_common()
 function wifi_connect()
 {
     ssid=$1
-    makeup_passphrase_for_ssid $ssid
+    need_chgpswd=0
+    conf_path=$wpa_config_dir/${ssid}.conf
+
+    # We only reset password only it is necessary.
+    # And,if the config file is not exist,then we must makeup it.
+    test -e $conf_path
+    conf_status=$?           # 0 => exist; 1 => not exist
+    if [ $conf_status -eq 0 ]
+    then
+        echo "It seems like the config file for $ssid is exist."
+        read -p "Do you want to change the password? [y/n](default n): " answer
+        case $answer in
+            y)
+                need_chgpswd=1
+                ;;
+            *)
+                need_chgpswd=0
+                ;;
+        esac
+    fi
+
+    if [[ $conf_status -eq 1 || ( $need_chgpswd -eq 1 && $conf_status -eq 0 ) ]]
+    then
+        makeup_passphrase_for_ssid $ssid
+    fi
+
     wifi_connect_common $ssid
     if [ $? -eq 0 ]
     then
