@@ -1,0 +1,28 @@
+
+GCC and Clang support attribute cleanup(...) :
+  this attribute can only apply to variables.
+
+  attribute cleanup(...) is used to instruct compiler invoke a specified
+  function when the variable goes out its scope.
+
+  the specified function requires a parameter is type of void * and no return,
+  cleanup invoke it with address of that variable.
+
+  void cleanup_free(void *pointer)
+  {
+          void **pp = (void **)pointer;
+          free(*pp);
+  }
+
+  void func(void)
+  {
+          __attribute__((cleanup(cleanup_free))) int *x = malloc(sizeof(int));
+          *x = 4;
+          ...
+          return;
+  }       /* function cleanup_free() is called with parameter &@x.
+           * @pointer = &@x,type int ** converted to void *.
+           * @pp = (void **)pointer,this is OK,because @pointer is
+           * a pointer points to a pointer that points to a int object.
+           * free(*@pp) => free(*(&@x)) => free(@x)
+           */
