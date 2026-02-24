@@ -237,6 +237,32 @@
   (max-sub-sum seq)
   )
 
+#||
+ | for each element in @seq
+ |     current sum := current sum + current element
+ |     if current sum > maximum sum
+ |         let maximum sum := current sum
+ |     if current sum < 0
+ |         reset current sum to 0
+ |#
+(define (maximum-subsequence-sum4 seq)
+  (define max-sum 0)
+  (define (for-each current the-seq)
+    (if (not (null? the-seq))
+        (let
+            ((new-sum (+ current (car the-seq))))
+          (if (> new-sum max-sum)
+              (set! max-sum new-sum))
+          (if (< new-sum 0)
+              (for-each 0 (cdr the-seq))
+              (for-each new-sum (cdr the-seq)))
+          )
+        '())
+    )
+  (for-each 0 seq)
+  max-sum)
+
+
 
 
 
