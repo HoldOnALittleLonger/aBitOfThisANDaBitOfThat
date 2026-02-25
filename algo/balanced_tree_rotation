@@ -1,0 +1,96 @@
+Unbalanced condition test :
+
+    !! a tree is unbalanced at node N,if the hight differ between
+       N's left child and N's right child is 2.
+       hight of leave node is 0.
+       hight of null node  is -1
+
+    Node is N
+    X is newly inserted
+    Left-N is left child of N
+    Right-N is right child of N
+
+            A           X < N->element => we inserted X in N's left sub-tree
+           / \          X < Left-N->element => we inserted X in Left-N's left sub-tree
+          N   E         <=         
+         /                                         
+        C
+       /
+      X                 (external)
+
+                
+            A           X < N->element => we inserted X in N's left sub-tree
+           / \          X > Left-N->element => we inserted X in Left-N's right sub-tree
+          N   E         <=
+         /
+        C
+         \
+          X             (internal)
+
+
+            A           X > N->element => we inserted X in N's right sub-tree
+           / \          X > Right-N->element => we inserted X in Right-N's right sub-tree
+          B   N         <=
+               \
+                D
+                 \
+                  X     (external)
+
+            A           X > N->element => we inserted X in N's right sub-tree
+           / \          X < Right-N->element => we inserted X in Right-N's left sub-tree
+          B   N         <=
+               \
+                D
+               /
+              X         (internal)
+
+Rotation :
+  external case need once rotation.
+  internal case need twice rotations.
+
+  left-to-right rotation :
+    Left-N become N's parent, N become Left-N's right child
+    Left-N instead the old position of N
+  right-to-left rotation :
+    Right-N become N's parent, N become Right-N's left child
+    Right-N instead the old position of N
+
+  external :
+          
+          R        =>        R
+         / \                / \
+        N   E              C   E
+       /                  / \
+      C                  X   N
+     /
+    X
+
+          R        =>        R
+         / \                / \
+        E   N              E   C
+             \                / \
+              C              N   X
+               \
+                X
+
+  internal :
+
+          R        =>        R        =>        R
+         / \                / \                / \
+        N   E              N   E              X   E
+       /                  /                  / \
+      C                  X                  C   N
+       \                /
+        X              C
+
+          R        =>        R        =>        R
+         / \                / \                / \
+        E   N              E   N              E   X
+             \                  \                / \
+              C                  X              N   C
+             /                    \
+            X                      C
+
+    ! for internal case,we need to rotate the tree once to let
+      it become external case,and then rotate it again to let it
+      become balanced.
