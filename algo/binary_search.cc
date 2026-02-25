@@ -14,17 +14,15 @@
 template<typename _Tp>
 const _Tp *binary_search(const _Tp& x, const _Tp array[], std::size_t size)
 {
-  std::size_t middle(size / 2);
-  if (!middle)
+  if (!size)
     return NULL;
 
-  const auto left_side(array);
-  const auto right_side(array + middle);
+  std::size_t middle(size / 2);
 
-  if (left_side[middle - 1] == x)
-    return &left_side[middle - 1];
-  else if (left_size[middle - 1] < x)
-    return binary_search(x, right_side, size - middle);
-  else
-    return binary_search(x, left_side, middle);
+  if (array[middle] == x)
+    return &array[middle];
+  else if (array[middle] < x)
+    return binary_search(x, array + middle + 1, size - middle - 1);
+  else                      // ^skip the tested element
+    return binary_search(x, array, middle);
 }
