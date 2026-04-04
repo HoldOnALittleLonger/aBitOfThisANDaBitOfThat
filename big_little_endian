@@ -2,6 +2,10 @@ Value : 53321
 Binary bits : 00000000000000001101000001001001
               H                              L
 
+We assume the memory unit numbers bit from right 0 to left 7.
+If the memory unit numbers bit in the converse order,this should
+be right,we just need to swap the near bits in a memory unit.
+
 Big Endian Byte Order :
 
         lower memory address
@@ -10,6 +14,7 @@ Big Endian Byte Order :
         +---------------+ +---------------+ +---------------+ +---------------+
         |               |                                     high memory address
         +--> 1  byte <--+
+        7               0
 
 Little Endian Byte Order :
 

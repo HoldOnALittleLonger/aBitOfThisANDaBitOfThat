@@ -14,10 +14,10 @@
  *     start sorting :
  *       iL start from 0
  *       iR start from right - 1
- *     while @iL < iR
+ *     while @iL < @iR
  *     do
- *       while @S[++@iL] < @v ;
- *       while @S[--@iR] > @v ;
+ *       while @S[++@iL] < @v 
+ *       while @S[--@iR] > @v 
  *
  *       # the first time @iL and @iR stopped
  *         @iL : 1 => 66
@@ -38,37 +38,56 @@
 
 #include <stddef.h>
 
-#define CUTOFF (3)
-void quick_sort_helper(int input[], size_t left, size_t right)
+#define CUTOFF 3
+
+static size_t swap_and_return_vidx(int input[], size_t left, size_t right)
+{
+        size_t iV = (left + right) / 2;
+        int tmp = 0;
+
+        if (input[iV] > input(right)) {
+                tmp = input[right];
+                input[right] = input[iV];
+                input[iV] = tmp;
+        }
+
+        if (input[left] > input[right]) {
+                tmp = input[right];
+                input[right] = input[left];
+                input[left] = tmp;
+        }
+
+        if (input[left] > input[iV]) {
+                tmp = input[left];
+                input[left] = input[iV];
+                input[iV] = tmp;
+        }
+
+        return iV
+}
+
+void quick_sort(int input[], size_t left, size_t right)
 {
         if (left + CUTOFF >= right) {
                 insertion_sort(input + left, right - left + 1); 
         } else {
-                int iL = left;
-                int iR = right;
-                int iV = (left + right) / 2;
-                int tmp = 0;
+                size_t iL = left;
+                size_t iR = right;
 
-                /* swap [0], [middle], [last] */
-                if (input[iV] > input[iR]) {
-                        tmp = input[iR];
-                        input[iR] = input[iV];
-                        input[iV] = tmp;
-                }
-                if (input[iL] > input[iR]) {
-                        tmp = input[iR];
-                        input[iR] = input[iL];
-                        input[iL] = tmp;
-                }
-                if (input[iL] > input[iV]) {
-                        tmp = input[iV];
-                        input[iV] = input[iL];
-                        input[iL] = tmp;
-                }                
-
-                /* get @v out sequence */
+                size_t iV = swap_and_return_vidx(input, iL, iR);
                 int v = input[iV];
-                tmp = input[--iR];
+
+                /**
+                 * get @v out to sequence
+                 *                           +-----------+
+                 *                           |           |
+                 *                           |           V
+                 * [ left | left + 1 | ... | v | ... | right - 1 | right ]
+                 *                           ^         |
+                 *                           |         |
+                 *                           +---------+
+                 */
+                int tmp = input[--iR];
                 input[iR] = v;
                 input[iV] = tmp;
 
@@ -83,13 +102,13 @@ void quick_sort_helper(int input[], size_t left, size_t right)
                         }
                 }
 
-                /* get @v back sequence */
+                /* get @v back to sequence */
                 tmp = input[iL];
                 input[iL] = v;
                 input[right - 1] = tmp;
 
-                /* remaining */
-                quick_sort_helper(input, left, i - 1);
-                quick_sort_helper(input, i + 1, right);
+                /* sort the rest */
+                quick_sort(input, left, iL - 1);
+                quick_sort(input, iL + 1, right);
         }
 }
