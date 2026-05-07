@@ -97,7 +97,6 @@ static inline void match_result_add(struct match_result *new, struct match_resul
         list_add(&new->list, &head->list);
 }
 
-/* if head is NULL,no printing */
 static void match_result_print_all(struct match_result *head)
 {
         struct match_result *next_item = NULL;
