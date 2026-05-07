@@ -100,9 +100,6 @@ static inline void match_result_add(struct match_result *new, struct match_resul
 /* if head is NULL,no printing */
 static void match_result_print_all(struct match_result *head)
 {
-        if (!head)
-                return;
-
         struct match_result *next_item = NULL;
 
         fprintf(stdout, "file offset : %ld\n", head->file_offset);
@@ -114,9 +111,6 @@ static void match_result_print_all(struct match_result *head)
 /* destroy all match results */
 static void match_result_destroy_all(struct match_result *head)
 {
-        if (!head)
-                return;
-
         struct match_result *next_item, *temp_item;
         next_item = temp_item = NULL;
 
@@ -190,7 +184,7 @@ static inline void destroy_match_space(struct match_space *m)
 }
 
 /* move text piece to match space */
-static bool move_to_match_space(const char *datum, size_t d_size, struct match_space *m)
+static bool move_to_match_space(char *datum, size_t d_size, struct match_space *m)
 {
         if (d_size >= m->buffer_capacity)
                 return false;
@@ -270,8 +264,6 @@ int main(int argc, char *argv[])
                 return -1;
         }
 
-        int ret = 0;
-
         /* open file */
         FILE *fd = fopen(file_path, "r");
         if (!fd) {
@@ -279,34 +271,47 @@ int main(int argc, char *argv[])
                 return -1;
         }
 
-        /* setup pattern buffer and match space buffer */
+        /**
+         * we initialize resource descriptors before allocate memory,then
+         * we can simply jump to cleaning position when allocating failed.
+         * free NULL pointer no segment fault.
+         */
+        int ret = 0;
         struct pattern p = {0};
+        struct match_space m = {0};
+
+        bool matched = false;
+        struct match_result *mrs = NULL;
+
+        size_t buffer_length = 4096;
+        char *text_buffer = NULL;
+        
+        /* setup pattern buffer and match space buffer */
         if (!set_pattern(&p, match_string)) {
                 fprintf(stderr, "error: set pattern failed - %s\n", match_string);
                 ret = -1;
-                goto exit_err_close_file;
+                goto exit_err_clean;
         }
 
-        /* preprocess pattern early */
-        if (!CAST_SENSITIVE)
-                preprocess_lowercast_alphabet(p.pattern_buffer, upper_cast);
-
-        struct match_space m = {0};
         if (!set_match_space(&m, strlen(match_string))) {
                 fprintf(stderr, "error: set match space failed\n");
                 ret = -1;
-                goto exit_err_pattern_clean;
+                goto exit_err_clean;
         }
 
         /* match result collection */
-        struct match_result *mrs = NULL;
+        mrs = match_result_alloc_init();
+        if (!mrs) {
+                fprintf(stderr, "error: alloc match_result failed\n");
+                ret = -1;
+                goto exit_err_clean;
+        }
 
         /* buffer initialization,once read operation at most 4kB */
-        size_t buffer_length = 4096;
-        char *text_buffer = malloc(sizeof(char) * buffer_length);
+        text_buffer = malloc(sizeof(char) * buffer_length);
         if (!text_buffer) {
                 ret = -1;
-                goto exit_err_match_space_clean;
+                goto exit_err_clean;
         }
         memset(text_buffer, 0, buffer_length);
         
@@ -314,6 +319,10 @@ int main(int argc, char *argv[])
         size_t to_read = buffer_length;
         size_t valid_length = 0;
         size_t last_remain = 0;
+
+        /* preprocess pattern early */
+        if (!CAST_SENSITIVE)
+                preprocess_lowercast_alphabet(p.pattern_buffer, upper_cast);
 
         /**
          * read text from file stream,and try match pattern.
@@ -336,14 +345,14 @@ int main(int argc, char *argv[])
                 if (valid_length < p.buffer_capacity - 1)
                         break;
 
-                const char *start = text_buffer;
+                char *start = text_buffer;
                 const char *end = text_buffer + valid_length;
 
                 while (start < end) {
                         if (!move_to_match_space(start, p.buffer_capacity - 1, &m)) {
                                 fprintf(stderr, "error: move content failed\n");
                                 ret = -1;
-                                goto exit_err_mrs_clean;
+                                goto exit_err_clean;
                         }
 
                         /**
@@ -353,21 +362,15 @@ int main(int argc, char *argv[])
                         if (match_it(&p, &m, CAST_SENSITIVE ? no_upper_cast : upper_cast)) {
                                 long the_offset = current_offset + (start - text_buffer);
 
-                                /* we need to use the head to store something */
-                                if (!mrs) {
-                                        mrs = match_result_alloc_init();
-                                        if (!mrs) {
-                                                fprintf(stderr, "error: alloc match result failed\n");
-                                                ret = -1;
-                                                goto exit_err_free_text_buffer;
-                                        }
+                                if (!matched) {
                                         mrs->file_offset = the_offset;
+                                        matched = true;
                                 } else {
                                         struct match_result *mr = match_result_alloc_init();
                                         if (!mr) {
                                                 fprintf(stderr, "error: alloc match result failed\n");
                                                 ret = -1;
-                                                goto exit_err_mrs_clean;
+                                                goto exit_err_clean;
                                         }
                                         mr->file_offset = the_offset;
                                         match_result_add(mr, mrs);
@@ -405,27 +408,17 @@ int main(int argc, char *argv[])
         if (ferror(fd)) {
                 fprintf(stderr, "error: read file failed.\n");
                 ret = -1;
-                goto exit_err_mrs_clean;
-        }
+        } else if (matched)
+                match_result_print_all(mrs);
 
-        match_result_print_all(mrs);
-
-/* cleaning follow stack order */
-
-exit_err_mrs_clean:
-        match_result_destroy_all(mrs);
-
-exit_err_free_text_buffer:
+exit_err_clean:
         free(text_buffer);
-
-exit_err_match_space_clean:
         destroy_match_space(&m);
-
-exit_err_pattern_clean:
         destroy_pattern(&p);
 
-exit_err_close_file:
-        fclose(fd);
+        if (mrs)
+                match_result_destroy_all(mrs);
 
+        fclose(fd);
         return ret;
 }
