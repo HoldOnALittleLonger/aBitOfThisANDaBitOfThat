@@ -6,57 +6,51 @@
 
 #if defined(UM_CONFIG_X_MACRO)
 
-#ifdef X_MACRO_INITIALIZER
-#define X_MACRO(__type, __name, __initializer) __type __name = {(__initializer)};
-#else /* X_MACRO HAS INITIALIZER */
-#define X_MACRO(__type, __name) __type __name;
-#endif /* X_MACRO NO INITIALIZER */
+#define X_MACRO_DECLARATION(__linkage, __type, __name)  \
+        __linkage __type __name;
 
-#ifndef LIST_VARIABLES
-#if defined(X_MACRO_INITIALIZER)
-#define LIST_VARIABLESN
+#define X_MACRO_DECLARATION_INIT(__linkage, __type, __name, __initializer) \
+        __linkage __type __name = {(__initializer)};
 
-#define LIST_VARIABLES1(__type, __initializer, __name1) \
-        X_MACRO(__type, __name1, __initializer)
+#define X_MACRO_DECLARATION_GLOBAL(__type, __name)  \
+        __type __name;
 
-#define LIST_VARIABLES2(__type, __initializer, __name1, __name2)    \
-        LIST_VARIABLES1(__type, __initializer, __name1)             \
-        LIST_VARIABLES1(__type, __initializer, __name2)
+#define X_MACRO_DECLARATION_INIT_GLOBAL(__type, __name, __initializer)  \
+        __type __name = {(__initializer)};
 
-#define LIST_VARIABLES3(__type, __initializer, __name1, __name2, __name3) \
-        LIST_VARIABLES1(__type, __initializer, __name1)                 \
-        LIST_VARIABLES2(__type, __initializer, __name2, __name3)
+#define X_MACRO_DECLARATION_STATIC(__type, __name)  \
+        X_MACRO_DECLARATION(static, __type, __name)
 
-#define LIST_VARIABLES4(__type, __initializer, __name1, __name2, __name3, \
-                        __name4)                                        \
-        LIST_VARIABLES2(__type, __initializer, __name1, __name2)        \
-        LIST_VARIABLES2(__type, __initializer, __name3, __name4)
+#define X_MACRO_DECLARATION_INIT_STATIC(__type, __name, __initializer)  \
+        X_MACRO_DECLARATION_INIT(static, __type, __name, __initializer)
 
-#define LIST_VARIABLES5(__type, __initializer, __name1, __name2, __name3, \
-                        __name4, __name5)                               \
-        LIST_VARIABLES2(__type, __initializer, __name1, __name2)        \
-        LIST_VARIABLES3(__type, __initializer, __name3, __name4, __name5)
-        
-#define LIST_VARIABLES6(__type, __initializer, __name1, __name2, __name3, \
-                        __name4, __name5, __name6)                      \
-        LIST_VARIABLES3(__type, __initializer, __name1, __name2, __name3) \
-        LIST_VARIABLES3(__type, __initializer, __name4, __name5, __name6)   
+#define X__DO0()                                \
+        __DO()
 
+#define X__DO1(__DO, __param1)                  \
+        __DO((__param1))
 
-#define LIST_VARIABLES7(__type, __initializer, __name1, __name2, __name3, \
-                        __name4, __name5, __name6, __name7)             \
-        LIST_VARIABLES1(__type, __initializer, __name1)                 \
-        LIST_VARIABLES3(__type, __initializer, __name2, __name3, __name4) \
-        LIST_VARIABLES3(__type, __initializer, __name5, __name6, __name7)
+#define X__DO2(__DO, __param1, __param2)          \
+        X__DO1(__DO, __param1)                   \
+        X__DO1(__DO, __param2)
 
-#define LIST_VARIABLES8(__type, __initializer, __name1, __name2, __name3, \
-                        __name4, __name5, __name6, __name7, __name8)    \
-        LIST_VARIABLES2(__type, __initializer, __name1, __name2)        \
-        LIST_VARIABLES3(__type, __initializer, __name3, __name4, __name5) \
-        LIST_VARIABLES3(__type, __initializer, __name6, __name7, __name8)
+#define X__DO4(__DO, __param1, __param2, __param3, __param4)    \
+        X__DO2(__DO, __param1, __param2)                      \
+        X__DO2(__DO, __param3, __param4)
 
-#endif
-#endif /* LIST VARIABLES N */
+#define FOR_LIST_OF_VARIABLES0(__DO)            \
+        X__DO0()
+
+#define FOR_LIST_OF_VARIABLES1(__DO, __param1)   \
+        X__DO1(__DO, __param1)
+
+#define FOR_LIST_OF_VARIABLES2(__DO, __param1, __param2)  \
+        FOR_LIST_OF_VARIABLES1(__DO, __param1)           \
+        FOR_LIST_OF_VARIABLES1(__DO, __param2)
+
+#define FOR_LIST_OF_VARIABLES4(__DO, __param1, __param2, __param3, __param4) \
+        FOR_LIST_OF_VARIABLES2(__DO, __param1, __param2)                  \
+        FOR_LIST_OF_VARIABLES2(__DO, __param3, __param4)
 
 #endif /* X macro */
 
@@ -81,5 +75,62 @@
         })
 
 #endif /* container_of */
+
+/**
+ * Simple profile.
+ */
+#if defined(UM_CONFIG_PROFILE)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <errno.h>
+
+#define PROFILE_TIMESPEC2SECS(__ts_ptr)                         \
+        ({                                                      \
+                (double)((__ts_ptr)->tv_sec) +                  \
+                        (double)((__ts_ptr)->tv_nsec) / 1.0e9f; \
+        })
+
+static bool um_profile_err_give_up = false;
+#define PROFILE_GET_TIME(__clock_id, __ts_ptr)                      \
+        do {                                                        \
+                errno = 0;                                          \
+                if (clock_gettime(__clock_id, __ts_ptr) < 0) {      \
+                        fprintf(stderr,                             \
+                                "error: %s PROFILE GET TIME: %s\n", \
+                                __FILE__, strerror(errno));         \
+                        fprintf(stderr, "PROFILE: Give up\n");      \
+                        um_profile_err_give_up = true;              \
+                }                                                   \
+        } while (0)
+
+#define PROFILE_GET_MONOTONIC_TIME(__ts_ptr)        \
+        PROFILE_GET_TIME(CLOCK_MONOTONIC, __ts_ptr)
+
+static double um_profile_time_begin = 0;
+#define UM_PROFILE_BEGIN()                                          \
+        do {                                                        \
+                um_profile_time_begin = 0;                          \
+                um_profile_err_give_up = false;                     \
+                struct timespec ts = {0};                           \
+                PROFILE_GET_MONOTONIC_TIME(&ts);                    \
+                um_profile_time_begin = PROFILE_TIMESPEC2SECS(&ts); \
+        } while (0)
+
+#define UM_PROFILE_END(__label)                                         \
+        do {                                                            \
+                if (um_profile_err_give_up) {                           \
+                        fprintf(stderr, "PROFILE: Have given up\n");    \
+                        break;                                          \
+                }                                                       \
+                struct timespec ts = {0};                               \
+                PROFILE_GET_MONOTONIC_TIME(&ts);                        \
+                printf("%s profile: time cost - %fs\n",                 \
+                       __label,                                         \
+                       PROFILE_TIMESPEC2SECS(&ts) - um_profile_time_begin); \
+        } while (0)
+
+#endif /* profile */
 
 #endif /* header end */
