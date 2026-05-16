@@ -1,69 +1,12 @@
 /**
  * This program iterate file content to match a pattern string.
- * Macros of list_head just for test,ported from Linux Kernel.
- * The list_head is an embedded doubly-linked list,and we do
- * not need all list_head APIs in kernel,thus there is a part
- * of list_head macros.
- * ! container_of() macro relies on compiler features,
- *   it works fine on gcc 15.2.0 .
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
-
-#define container_of(__ptr, __type, __member) ({                        \
-                        const typeof(((__type *)0)->__member) *__mptr = __ptr; \
-                        (__type *)((char *)__mptr - offsetof(__type, __member)); \
-                })
-
-/* list_head,the embedded doubly-linked list */
-struct list_head {
-        struct list_head *prev;
-        struct list_head *next;
-};
-
-#define INITIALIZE_LIST_HEAD(__ptr)                 \
-        do {                                        \
-                (__ptr)->prev = (__ptr)->next = (__ptr);    \
-        } while (0)
-
-#define list_entry(__ptr, __type, __member) container_of(__ptr, __type, __member)
-
-#define list_for_each(__iter, __list_head) \
-        for (__iter = (__list_head)->next; __iter != (__list_head); __iter = __iter->next)
-
-#define list_for_each_entry(__ret_ptr, __list_head, __member)           \
-        for (__ret_ptr = list_entry((__list_head)->next, typeof(*__ret_ptr), __member); \
-             &__ret_ptr->__member != (__list_head);                     \
-             __ret_ptr = list_entry(__ret_ptr->__member.next, typeof(*__ret_ptr), __member))
-
-#define list_for_each_entry_safe(__ret_ptr, __temp_ptr, __list_head, __member) \
-        for (__ret_ptr = list_entry((__list_head)->next, typeof(*__ret_ptr), __member), \
-                     __temp_ptr = list_entry(__ret_ptr->__member.next, typeof(*__ret_ptr), __member); \
-             &__ret_ptr->__member != (__list_head);                     \
-             __ret_ptr = __temp_ptr,                                    \
-                     __temp_ptr = list_entry(__ret_ptr->__member.next, typeof(*__ret_ptr), __member))
-
-/* front insertion */
-#define list_add(__item, __list_head)                           \
-        do {                                                    \
-                struct list_head *next = (__list_head)->next;   \
-                (__list_head)->next = (__item);                 \
-                (__item)->prev = (__list_head);                 \
-                (__item)->next = next;                          \
-                next->prev = (__item);                          \
-        } while (0)
-
-#define list_del(__item)                                    \
-        do {                                                \
-                struct list_head *prev = (__item)->prev;    \
-                struct list_head *next = (__item)->next;    \
-                (__item)->prev = (__item)->next = (__item); \
-                prev->next = next;                          \
-                next->prev = prev;                          \
-        } while (0)                                         \
+#include "list_head.h"
 
 /**
  * match_result - structure used to represents the matched information,
