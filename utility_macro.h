@@ -6,23 +6,34 @@
 
 #if defined(UM_CONFIG_X_MACRO)
 
-#define X_MACRO_DECLARATION(__linkage, __type, __name)  \
-        __linkage __type __name;
-
-#define X_MACRO_DECLARATION_INIT(__linkage, __type, __name, __initializer) \
-        __linkage __type __name = {(__initializer)};
-
-#define X_MACRO_DECLARATION_GLOBAL(__type, __name)  \
+#define X_MACRO_DECLARATION(__type, __name)     \
         __type __name;
-
-#define X_MACRO_DECLARATION_INIT_GLOBAL(__type, __name, __initializer)  \
+#define X_MACRO_DECLARATION_INIT(__type, __name, __initializer) \
         __type __name = {(__initializer)};
 
+#define X_MACRO_DECLARATION_LINKAGE(__linkage, __type, __name) \
+        __linkage X_MACRO_DECLARATION(__type, __name)
+
+#define X_MACRO_DECLARATION_INIT_LINKAGE(__linkage, __type, __name, __initializer) \
+        __linkage X_MACRO_DECLARATION_INIT(__type, __name, __initializer)
+
 #define X_MACRO_DECLARATION_STATIC(__type, __name)  \
-        X_MACRO_DECLARATION(static, __type, __name)
+        X_MACRO_DECLARATION_LINKAGE(static, __type, __name)
 
 #define X_MACRO_DECLARATION_INIT_STATIC(__type, __name, __initializer)  \
-        X_MACRO_DECLARATION_INIT(static, __type, __name, __initializer)
+        X_MACRO_DECLARATION_INIT_LINKAGE(static, __type, __name, __initializer)
+
+#define X_MACRO_DECLARATION_CV(__cv, __type, __name) \
+        __cv X_MACRO_DECLARATION(__type, __name)
+
+#define X_MACRO_DECLARATION_INIT_CV(__cv, __type, __name, __initializer) \
+        __cv X_MACRO_DECLARATION_INIT(__type, __name, __initializer)
+
+#define X_MACRO_DECLARATION_CONST(__type, __name) \
+        X_MACRO_DECLARATION_CV(const, __type, __name)
+
+#define X_MACRO_DECLARATION_INIT_CONST(__type, __name, __initializer) \
+        X_MACRO_DECLARATION_INIT_CV(const, __type, __name, __initializer)
 
 #define X__DO0()                                \
         __DO()
@@ -132,5 +143,17 @@ static double um_profile_time_begin = 0;
         } while (0)
 
 #endif /* profile */
+
+#if defined(UM_CONFIG_LIKELY)
+
+#define um_compile_time_test_and_expect(__value, __expect) ({  \
+        __builtin_const_p((__value)) ?                         \
+        !!(__value) : __builtin_expect(!!(__value), __expect); \
+                })
+
+#define um_likely(__value) __builtin_expect(!!(__value), 1)
+#define um_unlikely(__value) __builtin_expect(!!(__value), 0)
+
+#endif /* likely */
 
 #endif /* header end */

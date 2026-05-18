@@ -20,6 +20,13 @@ print_something print_msg;
 print_something print_msg2;
 
 /**
+ * @print_msg_fp0 is a function pointer,the function
+ * it points to need has the signature that
+ * related to type definition print_something.
+ */
+print_something *print_msg_fp0 = print_msg;
+
+/**
  * function declaration for void print_msg3(void).
  */
 void (print_msg3)(void);
@@ -41,6 +48,7 @@ int main(void)
         print_msg();
         print_msg2();
         print_msg3();
+        print_msg_fp0();
 
         print_something_t pfp = print_msg;
         print_msg_fp();
