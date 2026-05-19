@@ -162,7 +162,7 @@ static double um_profile_time_begin = 0;
 
 #endif /* likely */
 
-#if defined (UM_CONFIG_BIT_ORDER)
+#if defined (UM_CONFIG_BIT_OP)
 #include <stdint.h>
 
 /**
@@ -234,7 +234,7 @@ static inline uint8_t um_highest_ord(unsigned long long v)
         __internal_var = __internal_var;    \
                 })
 
-#else /* __x86_64__ */
+#else /* !__x86_64__ */
 
 /* constant versions */
 #define um_swab32(__v) ({                           \
@@ -257,8 +257,8 @@ static inline uint8_t um_highest_ord(unsigned long long v)
                   ((__v_64 & (255ULL << 32)) >> 8));   \
         })
 
-#endif /* !__x86_64__ */ 
+#endif /* platform branch */
 
-#endif /* binary order */
+#endif /* binary op */
 
 #endif /* header end */
