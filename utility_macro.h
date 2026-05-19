@@ -1,11 +1,12 @@
 /**
- * This file contains some useful macro definitions.
+ * This file contains some useful macros and inline functions.
  */
 #ifndef _UTILITY_MACRO_H_
 #define _UTILITY_MACRO_H_
 
 #if defined(UM_CONFIG_X_MACRO)
 
+/* macros for declaration and initialization */
 #define X_MACRO_DECLARATION(__type, __name)     \
         __type __name;
 #define X_MACRO_DECLARATION_INIT(__type, __name, __initializer) \
@@ -35,6 +36,7 @@
 #define X_MACRO_DECLARATION_INIT_CONST(__type, __name, __initializer) \
         X_MACRO_DECLARATION_INIT_CV(const, __type, __name, __initializer)
 
+/* internal helpers */
 #define X__DO0()                                \
         __DO()
 
@@ -49,6 +51,7 @@
         X__DO2(__DO, __param1, __param2)                      \
         X__DO2(__DO, __param3, __param4)
 
+/* user interfaces */
 #define FOR_LIST_OF_VARIABLES0(__DO)            \
         X__DO0()
 
@@ -97,6 +100,7 @@
 #include <time.h>
 #include <errno.h>
 
+/* internal helpers */
 #define PROFILE_TIMESPEC2SECS(__ts_ptr)                         \
         ({                                                      \
                 (double)((__ts_ptr)->tv_sec) +                  \
@@ -119,6 +123,7 @@ static bool um_profile_err_give_up = false;
 #define PROFILE_GET_MONOTONIC_TIME(__ts_ptr)        \
         PROFILE_GET_TIME(CLOCK_MONOTONIC, __ts_ptr)
 
+/* user interfaces */
 static double um_profile_time_begin = 0;
 #define UM_PROFILE_BEGIN()                                          \
         do {                                                        \
@@ -131,12 +136,12 @@ static double um_profile_time_begin = 0;
 
 #define UM_PROFILE_END(__label)                                         \
         do {                                                            \
+                struct timespec ts = {0};                               \
+                PROFILE_GET_MONOTONIC_TIME(&ts);                        \
                 if (um_profile_err_give_up) {                           \
                         fprintf(stderr, "PROFILE: Have given up\n");    \
                         break;                                          \
                 }                                                       \
-                struct timespec ts = {0};                               \
-                PROFILE_GET_MONOTONIC_TIME(&ts);                        \
                 printf("%s profile: time cost - %fs\n",                 \
                        __label,                                         \
                        PROFILE_TIMESPEC2SECS(&ts) - um_profile_time_begin); \
@@ -146,6 +151,7 @@ static double um_profile_time_begin = 0;
 
 #if defined(UM_CONFIG_LIKELY)
 
+/* used compiler feature to similar likely() and unlikely() */
 #define um_compile_time_test_and_expect(__value, __expect) ({  \
         __builtin_const_p((__value)) ?                         \
         !!(__value) : __builtin_expect(!!(__value), __expect); \
@@ -155,5 +161,104 @@ static double um_profile_time_begin = 0;
 #define um_unlikely(__value) __builtin_expect(!!(__value), 0)
 
 #endif /* likely */
+
+#if defined (UM_CONFIG_BIT_ORDER)
+#include <stdint.h>
+
+/**
+ * um_highest_ord - use a loop to calculate the order of the
+ *                  most significant bit
+ * @v:              the value
+ * return:          order of most significant bit,return 0
+ *                  if @v is 0
+ */
+static inline uint8_t um_highest_ord(unsigned long long v)
+{
+        uint8_t ord = 0;
+        while (v != 0) v >>=1, ++ord;
+        return ord ? ord - 1 : 0;
+}
+
+/**
+ * UM_NEXT_POWER_OF2 - macro function to calculates the next
+ *                     value that is power of 2,start from
+ *                     a given value
+ * @__value:           value to start
+ * return:             unsigned long long value which is
+ *                     power of 2 next to @__value
+ */
+#define UM_NEXT_POWER_OF2(__value) ({           \
+        1ULL << (um_highest_ord(__value) + 1);  \
+                })
+
+/**
+ * UM_ALIGN_TO - macro function to compute the aligned value
+ * @__value:     the value want aligns to @__alignment
+ * @__alignment: alignment,must be power of 2
+ * return:       the value been aligned to @__alignment
+ * # @__value and @__alignment should be unsigned integers.
+ */
+#define UM_ALIGN_TO(__value, __alignment) ({                    \
+        ((__value) + (__alignment) - 1U) & ~(__alignment - 1U); \
+        })
+
+#ifdef __x86_64__
+
+/**
+ * UM_ASM_SWAB - inline assembly to executes "bswap" ins on
+ *               x86-64 platform.
+ */
+#define UM_ASM_SWAB(__io_var, __ins_suffix)          \
+        asm volatile(                                \
+                "bswap"#__ins_suffix" %0\n\t"        \
+                : "=r"(__io_var) : "0"(__io_var))
+
+/**
+ * um_swab32 - exchange the bytes of 32-bit integer,
+ *             swap first and last
+ *             swap second and next to last
+ *             ...
+ * @__v:       value
+ * return:     32-bit integer that been swapped
+ */
+#define um_swab32(__v) ({                   \
+        uint32_t __internal_var = __v;      \
+        UM_ASM_SWAB(__internal_var, l);     \
+        __internal_var = __internal_var;    \
+                })
+
+/* um_swab64 - 64 bit integer version */
+#define um_swab64(__v) ({                   \
+        uint64_t __internal_var = __v;      \
+        UM_ASM_SWAB(__internal_var, q);     \
+        __internal_var = __internal_var;    \
+                })
+
+#else /* __x86_64__ */
+
+/* constant versions */
+#define um_swab32(__v) ({                           \
+        uint32_t __v_32 = __v;                      \
+        __v_32 = ((__v_32 >>24) |                   \
+                  (__v_32 << 24) |                  \
+                  ((__v_32 & (255UL << 8)) << 8) |  \
+                  ((__v_32 & (255UL << 16)) >> 8)); \
+        })
+
+#define um_swab64(__v) ({                              \
+        uint64_t __v_64 = __v;                         \
+        __v_64 = ((__v_64 >> 56) |                     \
+                  (__v_64 << 56) |                     \
+                  ((__v_64 & (255ULL << 8)) << 40) |   \
+                  ((__v_64 & (255ULL << 48)) >> 40) |  \
+                  ((__v_64 & (255ULL << 16)) << 24) |  \
+                  ((__v_64 & (255ULL << 40)) >> 24) |  \
+                  ((__v_64 & (255ULL << 24)) << 8) |   \
+                  ((__v_64 & (255ULL << 32)) >> 8));   \
+        })
+
+#endif /* !__x86_64__ */ 
+
+#endif /* binary order */
 
 #endif /* header end */
