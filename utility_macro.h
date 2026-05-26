@@ -261,4 +261,71 @@ static inline uint8_t um_highest_ord(unsigned long long v)
 
 #endif /* binary op */
 
+#if defined(UM_CONFIG_TIME_COMPARE)
+
+#include <time.h>
+
+/**
+ * um_time_after - test whether timepoint @t1 is after timepoint @t2.
+ * @t1:            timepoint 1
+ * @t2:            timepoint 2
+ * return:         true  => @t1 is after than @t2
+ *                 false => @t1 is not after than @t2
+ * # time after:
+ *     if @t1 is after than @t2,then the value of @t1 must be
+ *     greater than @t2.
+ */
+static inline bool um_time_after(const struct timespec *t1, const struct timespec *t2)
+{
+        return ((long)t2->tv_sec - (long)t1->tv_sec) < 0 ||
+                (((long)t2->tv_sec - (long)t1->tv_sec) == 0 &&
+                 ((long)t2->tv_nsec - (long)t1->tv_nsec < 0));
+}
+
+#define um_time_before(__timespec_t1p, __timespec_t2p) ({   \
+        um_time_after(__timespec_t2p, __timespec_t1p);      \
+        })
+
+#define um_time_eq(__timespec_t1p, __timespec_t2p) ({   \
+        !um_time_after(__timespec_t1p, __timespec_t2p)  \
+        &&                                              \
+        !um_time_before(__timespec_t1p, __timespec_t2p);\
+        })
+
+#define um_time_before_eq(__timespec_t1p, __timespec_t2p) ({ \
+        !um_time_after(__timespec_t1p, __timespec_t2p);      \
+        })
+
+#define um_time_after_eq(__timespec_t1p, __timespec_t2p) ({ \
+        !um_time_before(__timespec_t1p, __timespec_t2p);    \
+        })
+
+#define um_time_out(__current_time, __time_deadline) ({ \
+        um_time_after(__current_time, __time_deadline); \
+        })
+
+/* time_t version */
+static inline bool um_time_after_time_t(time_t t1, time_t t2)
+{
+        return (long)t2 - (long)t1 < 0;
+}
+
+#define um_time_before_time_t(__time1, __time2) ({ \
+        um_time_after_time_t(__time2, __time1);    \
+        })
+
+#define um_time_eq_time_t(__time1, __time2) ({ \
+        __time1 == __time2;                    \
+        })
+
+#define um_time_after_eq_time_t(__time1, __time2) ({ \
+        !um_time_before_time_t(__time1, __time2);    \
+        })
+
+#define um_time_before_eq_time_t(__time1, __time2) ({ \
+        !um_time_after_time_t(__time1, __time2);      \
+        })
+
+#endif /* time compare */
+
 #endif /* header end */
