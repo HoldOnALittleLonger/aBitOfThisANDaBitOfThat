@@ -1,0 +1,31 @@
+C keyword 'restrict'
+    This qualifier can be used for a pointer type to make a promise
+      the object @OBJ pointed by pointer @P has no any other way
+      can access to it that bypass P.
+    A restricted pointer,can not points to the object which has
+      automatic storage-age
+      static linkage
+    Thus,we can only assign an address of an object to the restricted
+    pointer that must be heap-allocated.
+    The primary usage for this qualifier is in function's parameters
+    list,where 'restrict' is used to qualify the pointer type parameters.
+      int foo(int *restrict a, int *restrict b)
+      {
+        *a = 5;
+        *b = 6;
+        return *a + *b;
+      }
+
+      movq    $0x05, (%rdi)  # *a = 5
+      movq    $0x06, (%rsi)  # *b = 6
+
+      # movq    (%rdi), %rax <= removed because restrict optimization
+      # addq    $0x06, %rax  <= removed because restrict optimization
+    
+      movq    $0x0b, %rax    # a + b
+      ret
+
+    ! Compiler can freely to ignore 'restrict' qualifier if necessary.
+      If the promise made by 'restrict' keyword is broken later,
+      the execution would be undefined.
+      # so we usually need to limit the scope for restricted pointers.

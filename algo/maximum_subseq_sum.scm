@@ -177,7 +177,46 @@
     )
   (define (call-seq-length seq) (seq-length seq 0))
 
+
+
+
+
   (define (max-sub-sum seq)
+    
+    (define (max-sum seq currentv maxv)
+      (if (null? seq)
+          maxv
+          (let*
+              ((new_cv (+ currentv (car seq)))
+               (new_maxv (if (< maxv new_cv)
+                             new_cv
+                             maxv)
+                         ))
+            (max-sum (cdr seq) new_cv new_maxv)
+            )
+          )
+      )
+    
+    (define (bin-split-seq seq)
+      (cond ((= 1 (call-seq-length seq))
+             (cons seq '())
+             )
+            ((= 2 (call-seq-length seq))
+             (cons (cons (car seq) '())
+                   (cdr seq)
+                   )
+             )
+            (else
+             (let
+                 ((mid (ceiling (/ (call-seq-length seq) 2))))
+               (cons (subseq seq 0 mid)
+                     (seq-from-i seq mid)
+                     )
+               )
+             )
+            )
+      )
+    
     (cond ((null? seq) 0)
           ((= 1 (call-seq-length seq))
            (if (> (car seq) 0)
@@ -187,48 +226,15 @@
            )
           (else
            (let*
-               (define (bin-split-seq seq)
-                 (cond ((= 1 (call-seq-length seq))
-                        (cons seq '())
-                        )
-                       ((= 2 (call-seq-length seq))
-                        (cons (cons (car seq) '())
-                              (cdr seq)
-                              )
-                        )
-                       (else
-                        (let
-                            ((mid (ceiling (/ (call-seq-length seq) 2))))
-                          (cons (subseq seq 0 mid)
-                                (seq-from-i seq mid)
-                                )
-                          )
-                        )
-                       )
-                 )
-             (define (max-sum seq currentv maxv)
-               (if (null? seq)
-                   maxv
-                   (let*
-                       ((new_cv (+ currentv (car seq)))
-                        (new_maxv (if (< maxv new_cv)
-                                      new_cv
-                                      maxv)
-                                  ))
-                     (max-sum (cdr seq) new_cv new_maxv)
-                     )
-                   )
-               )
-
-             ((splited-seq (bin-split-seq seq))
-              (left-seq (car splited-seq))
-              (right-seq (cdr splited-seq))
-              (left-maxsum (max-sum left-seq 0 0))
-              (right-maxsum (max-sum right-seq 0 0))
-              (lmax (max-sub-sum left-seq))
-              (rmax (max-sub-sum right-seq))
-              )
-             (max lmax, rmax, (+ left-maxsum right-maxsum))
+               ((splited-seq (bin-split-seq seq))
+                (left-seq (car splited-seq))
+                (right-seq (cdr splited-seq))
+                (left-maxsum (max-sum left-seq 0 0))
+                (right-maxsum (max-sum right-seq 0 0))
+                (lmax (max-sub-sum left-seq))
+                (rmax (max-sub-sum right-seq))
+                )
+             (max lmax rmax (+ left-maxsum right-maxsum))
              )
            )
           )
@@ -238,12 +244,13 @@
   )
 
 #||
- | for each element in @seq
- |     current sum := current sum + current element
- |     if current sum > maximum sum
- |         let maximum sum := current sum
- |     if current sum < 0
- |         reset current sum to 0
+ | 3>
+ |  for each element in @seq
+ |      current sum := current sum + current element
+ |      if current sum > maximum sum
+ |          let maximum sum := current sum
+ |      if current sum < 0
+ |          reset current sum to 0
  |#
 (define (maximum-subsequence-sum4 seq)
   (define max-sum 0)
