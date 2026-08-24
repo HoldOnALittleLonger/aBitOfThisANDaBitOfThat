@@ -1,0 +1,150 @@
+Binary Heap
+===========
+    
+binary heap is a binary tree,but it is constructed via array rather than
+pointer nodes.
+this implementation is simpler than pointer nodes,can reduce the performance
+cost than the later.
+
+figure :
+        idx
+        [ 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | ... ] <= Array
+              |   |   |   |   |   |   |
+              |   |   |   |   |   |   +-->root->right->right
+              |   |   |   |   |   +--> root->right->left
+              |   |   |   |   +--> root->left->right
+              |   |   |   +--> root->left->left
+              |   |   +--> root->right
+              |   +--> root->left
+              +--> root
+                        root(1)
+                       /    \
+                      A(2)   B(3)
+                     / \    / \
+                    C   D  E   F
+                   (4) (5) (6) (7)
+                   /
+               Void Hole(8)
+                   
+
+through the figure shown above,we can know
+  > root of binary heap start from idx 1.
+  > for a node X
+      idx of X->left == idx of X * 2
+      idx of X->right == idx of X->left + 1
+
+heap order
+----------
+    
+the parent node's key must be less than its childs' keys,if the binary heap
+is "minimum binary heap";the parent node's key must be greater than its
+childs' keys,if the binary heap is "maximum binary heap".
+
+supported operations
+--------------------
+        
+  Insertion
+  DeleteMin    
+  DecreaseKey
+  IncreaseKey
+  Find
+
+void hole
+---------
+            
+in a binary heap,the void hole is the position where next insertion will
+attempts to insert new element at there.
+
+percolate up/down
+-----------------
+            
+if new element broken heap order,we must process "percolate up" for the node.
+if DeleteMin is performed,the root node will become void hole,we must process
+"percolate down" on the node to let it goes to the bottom of binary tree.
+
+routine :
+        procedure bh_percolate_up(bh_array: container of bh,
+                                  vidx: index of void hole)
+          if vidx > sizeof(bh_array) - 1
+          then
+            return
+    
+          pidx := vidx / 2
+          if pidx == 0 /* root's idx / 2 == 0 */
+          then
+            return
+
+          org_vkey := bh_array[vidx];
+
+          while pidx > 0
+            if org_vkey < bh_array[pidx]
+            then
+              bh_array[vidx] := bh_array[pidx]
+              vidx := pidx
+              pidx := vidx / 2
+            else
+              bh_array[vidx] := org_vkey
+              break
+    
+        procedure bh_percolate_down(bh_array: container of bh,
+                                    vidx: index of void hole)
+          if vidx > sizeof(bh_array) ||
+             !vidx
+          then
+            /**
+             * idx 0 is not a valid index of bh,thus we return
+             * it to indicates an error happened.
+             */
+            return 0
+
+          /**
+           * length() - returns the number of valid elements in
+           *            the array
+           * # [0] also count in length
+           * # we need to ensure,the idx less than @length must
+           *   be valid and it is not void hole.
+           */
+          length := bh_array.length()
+
+          while vidx < length
+            /**
+             * For large data set,we need to checks type overflow
+             * that may cause @lidx or @ridx around up to _zero_,
+             * idx _zero_ is not a legal index.
+             */
+            lidx := vidx * 2
+            ridx := lidx + 1
+    
+            /**
+             * @lidx and @ridx should less than @length,if they
+             * are valid and corresponds to an element in heap.
+             * otherwise,void hole been at the bottom of heap.
+             *
+             * lidx > length --> ridx > length
+             */
+            if lidx > length
+            then
+              break
+
+            /**
+             * Select the next element to swap with void hole,
+             * the minimum between left and right.
+             */
+            swap_e_idx := bh_array[lidx] > bh_array[ridx] ?
+                          ridx : lidx    
+
+            bh_array[vidx] := bh_array[swap_e_idx]
+
+            vidx := swap_e_idx
+
+          return vidx
+
+        ! For insertion,if there been a void hole is found(because the
+          routine bh_percolate_down() returned a valid idx),we can just
+          make use of the idx.
+          Otherwise,the next insertion position has idx
+            @next_pos := bh_array.length()
+                        #^because idx start from 0.
+          We can store the idx of void hole at [0],if its value is 0,
+          that means there is no void hole been found.
+    
