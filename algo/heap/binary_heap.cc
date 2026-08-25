@@ -13,7 +13,7 @@ struct binary_heap_struct {
   {
     capacity_ = !init_size ? DEFAULT_CAPACITY : init_size;
     try {
-      container_ = new _Tp[capacity_];
+      container_.reset(new _Tp[capacity_]);
     } catch (std::bad_alloc&) {
       std::runtime_error("error: allocate memory failed.");
     }
@@ -46,7 +46,7 @@ private:
     DEFAULT_CAPACITY = 32,
   };
 
-  std::size __capacity(void)
+  std::size_t __capacity(void)
   {
     return capacity_;
   }
@@ -91,8 +91,8 @@ private:
     container_[rhs] = tmp;
   }
 
-
-  std::unique_ptr<_Tp> container_;
+  /* _Tp[] => we will allocate array */
+  std::unique_ptr<_Tp[]> container_;
   std::size_t capacity_;
   std::size_t valid_len_;
 };
@@ -175,7 +175,7 @@ std::expected<_Tp, int> binary_heap_struct<_Tp>::delete_min(void)
 
     if (lidx < this->__length() && ridx < this->__length())
       next_idx = container_[lidx] > container_[ridx] ? ridx : lidx;
-    else if (lidx < this->_length())
+    else if (lidx < this->__length())
       next_idx = lidx;
     else
       break;
@@ -197,6 +197,27 @@ std::expected<_Tp, int> binary_heap_struct<_Tp>::delete_min(void)
   this->__dec_length();
 
   return result;
+}
+
+int main(void)
+{
+  binary_heap_struct<int> bh(16);
+  const int inputs[] = {
+    2, 3, 32, 6, 8, 22
+  };
+
+  for (unsigned int i = 0; i < sizeof(inputs) / sizeof(int); ++i)
+    if (!bh.insert(inputs[i]))
+      std::runtime_error("error: insertion failed.");
+
+  /* auto => std::expected<> */
+  auto min = bh.delete_min();
+  if (min.has_value())
+    std::println("min is {}", min.value());
+  else
+    std::println("delete_min failed.");
+
+  return 0;
 }
 
 
