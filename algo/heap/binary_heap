@@ -1,0 +1,199 @@
+Binary Heap
+===========
+binary heap is a binary tree,but it is constructed via array rather than
+pointer nodes.
+this implementation is simpler than pointer nodes,can reduce the performance
+cost than the later.
+
+figure :
+        idx
+        [ 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | ... ] <= Array
+              |   |   |   |   |   |   |
+              |   |   |   |   |   |   +-->root->right->right
+              |   |   |   |   |   +--> root->right->left
+              |   |   |   |   +--> root->left->right
+              |   |   |   +--> root->left->left
+              |   |   +--> root->right
+              |   +--> root->left
+              +--> root
+                        root(1)
+                       /    \
+                      A(2)   B(3)
+                     / \    / \
+                    C   D  E   F
+                   (4) (5) (6) (7)
+                   /
+               Void Hole(8)
+                   
+
+through the figure shown above,we can know
+  > root of binary heap start from idx 1.
+  > for a node X
+      idx of X->left == idx of X * 2
+      idx of X->right == idx of X->left + 1
+
+heap order
+----------
+    
+the parent node's key must be less than its childs' keys,if the binary heap
+is "minimum binary heap";the parent node's key must be greater than its
+childs' keys,if the binary heap is "maximum binary heap".
+
+supported operations
+--------------------
+        
+  Insertion
+  DeleteMin    
+  DecreaseKey
+  IncreaseKey
+
+void hole
+---------
+            
+in a binary heap,the void hole is the position where next insertion will
+attempts to insert new element at there.
+
+helper
+------
+  length() :
+    this function should returns number of current valid elements in the
+    heap,[0] is not counted in.
+    so,the idx of last inserted element would becomes the result returned
+    by length() after insertion accomplished.
+
+percolate up/down
+-----------------
+            
+if an element broken heap order,we must process "percolate up/down" for the node.
+
+routine :
+        procedure bh_percolate_up(bh_array: container of bh,
+                                  idx: idx of element needs percolate up)
+          if idx > bh_array->length()
+          then
+            throw "bad idx"
+
+          for (pidx := 0; idx > 0; idx := pidx)
+            pidx := idx / 2
+            if pidx == 0
+            then
+              break
+    
+            if bh_array[pidx] > bh_array[idx]
+            then
+              tmp := bh_array[pidx]
+              bh_array[pidx] := bh_array[idx]
+              bh_array[idx] := tmp
+            else
+              break
+
+        /* similar to percolate_up(),but it moves element from
+         * top to bottom.
+         */
+        procedure bh_percolate_down(bh_array: container of bh,
+                                    idx: idx of element needs percolate down)
+          if idx > bh_array->length()
+          then
+            throw "bad idx"
+
+          for (next_idx := 0; idx < bh_array->length(); idx := next_idx)
+            lidx := idx * 2
+            ridx := lidx + 1
+
+            if lidx < bh_array->length() && ridx < bh_array->length()
+            then
+              next_idx := bh_array[lidx] > bh_array[ridx] ? ridx : lidx
+            else if lidx < bh_array->length()
+              next_idx := lidx
+            else
+              break
+
+            if bh_array[idx] > bh_array[next_idx]
+            then
+              tmp := bh_array[idx]
+              bh_array[idx] := bh_array[next_idx]
+              bh_array[next_idx] := tmp
+            else
+              break
+            
+
+Operations
+----------
+  Insertion
+    procedure insert(bh: binary heap, new_value: new value to insert)
+      vidx := bh->length() + 1
+    
+      if vidx >= sizeof(bh)
+      then
+        throw "exceeded maximum size"
+
+      bh[vidx] := new_value
+      pvidx := vidx / 2
+
+      if pvidx > 0 && bh[pvidx] > bh[vidx]
+      then
+        percolate_up(bh, vidx)
+
+      bh->inc_length()
+
+  DeleteMine
+    procedure delete_min(bh: binary heap)
+      if bh->length() < 1
+      then
+        throw "delete min on null heap"
+
+      root_v := bh[1]
+      last_v := bh[bh->length()]
+      i := 1
+      for (next_i := 0; i < bh->length(); i := next_i)
+        lidx := i * 2
+        ridx := lidx + 1
+
+        if lidx < bh->length() && ridx < bh->length()
+        then
+          next_idx := bh[lidx] > bh[ridx] ? ridx : lidx
+        else if lidx < bh->length()
+          next_idx := lidx
+        else
+          break
+    
+        if last_v > bh[next_i]
+        then
+          bh[i] := bh[next_i]
+        else
+          break
+
+      bh[i] := last_v
+      bh->dec_length()
+
+      return root_v
+
+    ============================================================================
+    if DeleteMin is executed,then we need use the proper element to fill the
+    root,and root's child,and so on;finally,we need to move the last element --
+    which at the position is most right of the bottom,to fill the void hole that
+    been moved down to the proper position,to ensure the binary heap's next
+    insert position -- void hole always is the most right of bottom.    
+    ============================================================================
+
+  DecreaseKey
+    procedure decrease_key(bh: binary heap, idx: element that needs decrease key,
+                           delta: value to decrease)
+      if idx == 0 || idx > bh->length()
+      then
+        throw "exceeded length"
+
+      bh[idx] := bh[idx] - delta
+      percolate_up(bh, idx)
+
+  IncreaseKey
+    procedure increase_key(bh: binary heap, idx: element that needs increase key,
+                           delta: value to increase)
+      if idx == 0 || idx > bh->length()
+      then
+        throw "exceeded length"
+
+      bh[idx] := bh[idx] + delta
+      percolate_down(bh, idx)
+
+    
