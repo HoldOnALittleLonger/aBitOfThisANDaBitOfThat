@@ -196,4 +196,38 @@ Operations
       bh[idx] := bh[idx] + delta
       percolate_down(bh, idx)
 
+why do not implement this through binary-tree?
+----------------------------------------------
+
+if we implement this based on binary-tree,we need to probe the last element
+in the tree at every insertion.maybe we can cache the position,but we need
+to store height information in the nodes.
+there has two kinds of cases
+  1> current height @h is full of leaves,we need to go to the next height
+     @h + 1.
+     the next insert position is the most left leaf,we can arrive to it
+     through
+       root->left->left->...->left
+  2> current height @h is not full of leaves,we need to insert at current
+     height.
+     we need to probe the most right position at current height in the
+     nodes line.
+       [a, b] [c, d] [e, (f)] [(), ()]
+     so we need to probe (f).
+     we can traversal each leaf in the tree with height @h,if there is
+     a parent whose @left is NULL or @left is not NULL but @right is NULL,
+     we can determines the (f).
+     if current node's height less than @h,we enter its child tree.
+     there should never has a node whose height is greater than @h,except
+     @h is full of leaves.
+
+when delete min is executed,we need to probe (f) again,in order to use 
+fill the gap that occuries because root is dequeued.
+
+so that,implement binary heap through binary tree is not a good idea.
+it will brings a lot of complext works must to be done in the methods,
+that can be prevent by implement it through an array.        
+
+    
+
     
