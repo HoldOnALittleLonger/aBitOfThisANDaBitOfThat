@@ -63,7 +63,7 @@ private:
 
   void __dec_length(void)
   {
-    ++valid_len_;
+    --valid_len_;
   }
 
   std::size_t __left_idx(std::size_t idx)
