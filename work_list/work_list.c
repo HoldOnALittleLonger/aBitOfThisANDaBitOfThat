@@ -321,6 +321,10 @@ static void wthread_cleanup(void *work_list)
 static void worker_rollback_work(struct work_struct *work, struct work_list *work_list)
 {
         modify_work_state(work, WORK_STATE_INSCHED);
+        acquire_work_lock(work);
+        work->wthread_n = WTHREAD_UNSPECIFIED;
+        release_work_lock(work);
+        
         pthread_mutex_lock(&work_list->work_available.cond_mutex);
         work_list->work_available.is_available = true;
         pthread_cond_signal(&work_list->work_available.cond);
