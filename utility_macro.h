@@ -209,7 +209,7 @@ static inline uint8_t um_highest_ord(unsigned long long v)
  *               x86-64 platform.
  */
 #define UM_ASM_SWAB(__io_var, __ins_suffix)          \
-        asm volatile(                                \
+        asm volatile (                               \
                 "bswap"#__ins_suffix" %0\n\t"        \
                 : "=r"(__io_var) : "0"(__io_var))
 
@@ -352,6 +352,27 @@ static inline void um_dump_mem(void *mem, size_t range, const char *msg)
         setvbuf(stderr, NULL, _IOLBF, 0);
         fprintf(stderr, "\n[ ================================ CUT OFF ================================ ]\n");
 }
+
+#endif
+
+#if defined (UM_CONFIG_MEMBARRIER)
+
+#ifdef __x86_64__
+
+#define um_mb() asm volatile ("mfence":::"memory")
+#define um_rmb() asm volatile ("lfence":::"memory")
+#define um_wmb() asm volatile ("sfence":::"memory")
+
+#else /* !__x86_64__ */
+
+/* compiler barrier */
+#define um_barrier() asm volatile ("":::"memory")
+
+#define um_mb() um_barrier()
+#define um_rmb() um_mb()
+#define um_wmb() um_barrier()
+
+#endif
 
 #endif
 

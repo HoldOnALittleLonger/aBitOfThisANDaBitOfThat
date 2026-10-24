@@ -1,0 +1,232 @@
+work_list
+=========
+    work_list is a queue for works and the works would be handled by
+    pre-defined threads later.
+
+figure
+======
+    User1        User2        User3        ...
+     \           |              /
+      \          |             /  => start new work
+       \         |            /
+    [ work_struct | work_struct | ... | work_struct ]
+          |             |                   |
+          +-------------+-------------------+
+                        |
+                        V
+          <           work dispatcher       >
+                        |
+                        | dispatch
+                        |
+                        V
+     +------------------------------------------+
+    /                                            \
+    
+    [ thread0 | thread1 | thread2 | ... | threadN ]
+
+work_struct
+===========
+    a structure used to describes a TODO work.
+
+    typedef int (*work_handler_t)(void *);
+    typedef void (*work_finish_handler_t)(int, struct work_struct *);
+
+    struct work_struct {
+            work_handler_t handler;
+            work_finish_handler_t finish_handler;
+    
+            void *data;
+
+            pthread_spinlock_t lock;        
+            struct work_list *residing_list;
+            int refcnt;
+            enum work_thread_num wthread_n;
+
+            void (*destructor)(struct work_struct *work);    
+    };
+
+work_struct routines
+===================
+    /**
+     * alloc_work - allocate a work_struct object,and does
+     *              default initialization
+     * @wh:         work handler
+     * @wfh:        callback for work been finished
+     * @arg:        argument for @wh
+     * return:      newly created work_struct OR NULL
+     */
+    struct work_struct *alloc_work(work_handler_t wh, work_finish_handler_t wfh,
+                                   void *arg);
+
+    /**
+     * work_struct_destructor - destroy a work_struct
+     * @work:                   the work_struct
+     * # this function can only be called when ->refcnt becomes _zero_
+     */
+    void work_struct_destructor(struct work_struct *work);
+    e.g.
+            acquire_work_lock(work);
+            if (work->refcnt != 0) {
+                    work_print_info("BUG: destroy a work refcnt is not 0.");
+                    release_work_lock(work);
+                    /* abort() */
+            }
+            release_work_lock(work);
+            pthread_spin_destroy(&work->lock);
+            free(work);
+
+    /* increase ->refcnt unless it been _zero_ */
+    bool work_get(struct work_struct *work);
+    e.g.
+            acquire_work_lock(work);
+            if (work->refcnt > 0)
+                    work->refcnt++;
+            else {
+                    work_print_info("BUG: get a work its refcnt been 0.");
+                    release_work_lock(work);
+                    /* abort */
+                    return false;
+            }
+            relese_work_lock(work);
+            return true;
+
+    /* decrease ->refcnt and destroy work when refcnt falls to _zero_ */
+    void work_put(struct work_struct *work);
+    e.g.
+            acquire_work_lock(work);
+    
+            if (work->refcnt > 0) {
+                    work->refcnt--;
+                    if (work->refcnt == 0) {
+                            release_work_lock(work);
+                            goto destroy_work;
+                    }
+                    release_work_lock(work);
+                    return;
+            }       
+
+    destroy_work:
+            work->destructor(work);
+            return;
+
+    /* check whether work been initialized correctly */
+    bool work_is_init(struct work_struct *work);
+    e.g.
+            bool is_init = false;
+            acquire_work_lock(work);
+            is_init = work->handler != NULL &&
+                      work->finish_handler != NULL &&
+                      work->destructor != NULL;
+            release_work_lock(work);
+            return is_init;
+
+    /* check whether the work is residing on a work_list */
+    bool work_is_sched(struct work_struct *work);
+    e.g.
+            bool is_sched = false;
+            acquire_work_lock(work);
+            is_sched = work->residing_list != NULL;
+            release_work_lock(work);
+            return is_sched;
+
+    /* returns by value the thread number which dealing with this work */
+    enum work_thread_num work_threadn(struct work_struct *work);
+
+    /* try to holds ->lock,might sleep */
+    void acquire_work_lock(struct work_struct *work);
+    e.g.
+            pthread_spin_lock(&work->lock);
+
+    /* release ->lock */
+    void release_work_lock(struct work_struct *work);
+    e.g.
+            pthread_spin_unlock(&work->lock);
+
+work_list
+=========
+    the structure work_list acts like a controller of registered works,
+    it needs to
+      manage creation and stopping of worker threads
+      register and unregister works
+      dispatch works to workers
+
+    struct work_list {
+            pthread_t workers[...];
+            struct list_head works;
+
+            struct {
+                    bool is_available;
+                    pthread_mutex_t cond_mutex;
+                    pthread_cond_t cond;
+            } work_available;
+
+            pthread_spinlock_t lock;
+            int refcnt;
+    };
+
+work_list routines
+==================
+    /**
+     * create_workers - try to create all worker threads
+     * @work_list:      work_list
+     * return:          0 OR -1
+     * # this routine starts all POSIX threads with a special
+     *   thread function,the argument to that function is
+     *   @work_list.
+     *   if succeed to creates a new thread,it will saves
+     *   TID into @work_list->workers[];if any error happened,
+     *   it will cancel all started workers and wait for them,
+     *   reset elements of ->workers[] to 0.
+     */
+    int create_workers(struct work_list *work_list);
+
+    /* stop_all_workers - cancel and wait workers,reset ->workers[] */
+    void stop_all_workers(struct work_list *work_list);
+
+    /* alloc_work_list - allocate a new work list */
+    struct work_list *alloc_work_list(void);
+    
+    /* destructor of work_list */
+    void work_list_dtor(struct work_list *work_list);
+
+    /* get refcnt,unless refcnt been _zero_ */
+    work_list_get()
+
+    /* put refcnt,unless refcnt been _zero_.
+     * if refcnt falls into _zero_,invoke destructor.
+     */
+    work_list_put()
+
+    /**
+     * register_work - register a new work with work list
+     * @work:          new work
+     * @work_list:     the work list
+     * return:         0 OR -1
+     * # this routine will list_add() @work->list into list
+     *   @work_list->works,modify @work's state to in-sched.
+     *   both refcnt(s) of @work and @work_list will increase 1.
+     * # this routine will notifies all waiters on new work
+     *   condition.
+     */
+    int register_work(struct work_struct *work, struct work_list *work_list);
+
+    /**
+     * unregister_work - unregister a work from work list
+     * @work:            the work we want to unregister
+     * # UNDO register_work(),but would not modify @work's state.
+     */
+    void unregister_work(struct work_struct *work);
+
+    /**
+     * get_next_work - return the next in-sched work
+     * @work_list:     work list
+     * return:         new work descriptor OR NULL
+     * # this routine can only be called by thread function,
+     *   and in which a cancelation point is exist --
+     *   pthread_cond_wait().
+     * # except the work being return,if there is no more work,
+     *   this routine will set ->work_available.is_available to
+     *   FALSE,otherwise,set to TRUE and notify waiters.
+     */
+    struct work_struct *get_next_work(struct work_list *work_list);
+
