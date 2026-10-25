@@ -2,6 +2,7 @@
 
 #include "work.h"
 
+/* un-implemented */
 static void BUG(const char *arg) { }
 
 /**
@@ -59,4 +60,53 @@ struct work_struct *alloc_work(work_handler_t wh,
 exit_free:
         free(new_work);
         return NULL;
+}
+
+/**
+ * work_get - get work's refcnt unless refcnt been _zero_
+ */
+bool work_get(struct work_struct *work)
+{
+        acquire_work_lock(work);
+        /* we get ref if and only if the object's refcnt
+         * is not _zero_,otherwise,we treat it as the
+         * object is not exists.
+         */
+        if (work->refcnt <= 0) {
+                release_work_lock(work);
+                return false;
+        }
+        work->refcnt++;
+        release_work_lock(work);
+        return true;
+}
+
+/**
+ * work_put - put work's refcnt unless refcnt been _zero_,
+ *            and if refcnt falls into _zero_,->destructor
+ *            will be called on this work
+ */
+void work_put(struct work_struct *work)
+{
+        acquire_work_lock(work);
+        if (work->refcnt > 0) {
+                work->refcnt--;
+                if (!work->refcnt) {
+                        release_work_lock(work);        
+                        work->destructor(work);                        
+                        return;
+                }
+
+        }
+        release_work_lock(work);
+}
+
+/* read and return work's current state */
+enum work_state __return_work_state(struct work_struct *work)
+{
+        enum work_state s;
+        acquire_work_lock(work);
+        s = work->state;
+        release_work_lock(work);
+        return s;
 }

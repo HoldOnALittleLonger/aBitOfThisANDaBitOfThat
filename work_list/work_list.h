@@ -58,41 +58,11 @@ static inline void work_list_unlock(struct work_list *work_list)
 extern struct work_list *alloc_work_list(void);
 extern void work_list_dtor(struct work_list *work_list);
 
-/**
- * get refcnt unless refcnt is _zero_.
- */
-static inline bool work_list_get(struct work_list *work_list)
-{
-        work_list_lock(work_list);
-        if (work_list->refcnt <= 0) {
-                work_list_unlock(work_list);
-                return false;
-        }
-        work_list->refcnt++;
-        work_list_unlock(work_list);
-        return true;
-}
-
+extern bool work_list_get(struct work_list *);
+extern void work_list_put(struct work_list *);
 
 /**
- * put refcnt,automatically destroy if refcnt falls into _zero_.
- */
-static inline void work_list_put(struct work_list *work_list)
-{
-        work_list_lock(work_list);
-        if (work_list->refcnt > 0) {
-                work_list->refcnt--;
-                if (!work_list->refcnt) {
-                        work_list_unlock(work_list);
-                        work_list_dtor(work_list);
-                        return;
-                }
-        }
-        work_list_unlock(work_list);        
-}
-
-/**
- * which_wthread - function,maps TID to worker identifier
+ * which_wthread - routine maps TID to worker identifier
  */
 static inline enum work_thread_num which_wthread(struct work_list *work_list)
 {

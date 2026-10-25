@@ -8,25 +8,13 @@
 
 int handler(void *arg)
 {
-        printf("work handler is called\n");
-        printf("work handler argument is %p\n", arg);
-        printf("work handler sleep 1 second\n");
         sleep(1);
-        printf("work handler return\n");
         return 0;
 }
 
 void finish_handler(int ret, struct work_struct *work)
 {
-        printf("work finish handler is called\n");
-        printf("work handler returned -- %d\n", ret);
-        printf("worker is %d\n", work->wthread_n);
-        printf("work state is %d\n", work->state);
-        printf("work refcnt is %d\n", work->refcnt);
-        printf("work descriptor at %p\n", work);
-        printf("work finish handler sleep 1 second\n");
         sleep(1);
-        printf("work finish handler wakeup,return\n");
 }
 
 #define WORK_NUM 5
@@ -69,19 +57,19 @@ int main(void)
                 }
         }
 
-        printf("main thead: poll works whether been finished...\n");
+        printf("main thread: poll works whether been finished...\n");
         for (unsigned short widx = 0; widx < WORK_NUM; ++widx) {
                 struct work_struct *w = w_desc[widx];
                 do {
-                        if (work_is_finished(w))
+                        if (work_is_finished(w)) {
+                                printf("main thread: work -- %p has been finished,put it\n",
+                                       w);
+                                work_put(w);
                                 break;
+                        }
                 } while (1);
         }
-
-        printf("main thread: all works finished,put them\n");
-        for (unsigned short widx = 0; widx < WORK_NUM; ++widx)
-                work_put(w_desc[widx]);
-
+        
         printf("main thread: stop workers\n");
         stop_all_workers(wl);
 

@@ -4,7 +4,7 @@
 #include "work_list.h"
 #include "work.h"
 
-/* unimplemented */
+/* un-implemented */
 static void BUG(const char *arg) { }
 
 /**
@@ -74,6 +74,38 @@ void work_list_dtor(struct work_list *work_list)
         pthread_spin_destroy(&work_list->lock);
         
         free(work_list);
+}
+
+/**
+ * get refcnt unless refcnt is _zero_.
+ */
+bool work_list_get(struct work_list *work_list)
+{
+        work_list_lock(work_list);
+        if (work_list->refcnt <= 0) {
+                work_list_unlock(work_list);
+                return false;
+        }
+        work_list->refcnt++;
+        work_list_unlock(work_list);
+        return true;
+}
+
+/**
+ * put refcnt,automatically destroy if refcnt falls into _zero_.
+ */
+void work_list_put(struct work_list *work_list)
+{
+        work_list_lock(work_list);
+        if (work_list->refcnt > 0) {
+                work_list->refcnt--;
+                if (!work_list->refcnt) {
+                        work_list_unlock(work_list);
+                        work_list_dtor(work_list);
+                        return;
+                }
+        }
+        work_list_unlock(work_list);        
 }
 
 void *worker_routine(void *arg);
@@ -236,7 +268,12 @@ static struct work_struct *get_next_work(struct work_list *work_list)
                                   &work_list->work_available.cond_mutex);
         pthread_mutex_unlock(&work_list->work_available.cond_mutex);
 
-        /* traverse work list to find work */
+        /**
+         * traverse work list to find work.
+         * this operation is time-cost in the case the list
+         * is too long,the better way is to use rw lock instead
+         * spinlock.
+         */
         work_list_lock(work_list);
         list_for_each_entry(iter, &work_list->works, list) {
                 if (work_is_sched(iter)) {
@@ -302,10 +339,11 @@ static void wthread_cleanup(void *work_list)
         struct work_list *wl = (struct work_list *)work_list;
 
         /**
-         * we can unlock the mutex,because it is error checking type.
+         * we can unlock the mutex,because its type is error checking.
          * if the cancelation point is not cond wait,the mutex may
          * not be acquired by this thread,so unlock it will returns
          * EPERM,we ignore the error.
+         * otherwise,the lock is acquired by this thread,we unlock it.
          */
         pthread_mutex_unlock(&wl->work_available.cond_mutex);
         
@@ -320,11 +358,13 @@ static void wthread_cleanup(void *work_list)
  */
 static void worker_rollback_work(struct work_struct *work, struct work_list *work_list)
 {
+        /* rollback work's state */
         modify_work_state(work, WORK_STATE_INSCHED);
         acquire_work_lock(work);
         work->wthread_n = WTHREAD_UNSPECIFIED;
         release_work_lock(work);
-        
+
+        /* signal waiters */
         pthread_mutex_lock(&work_list->work_available.cond_mutex);
         work_list->work_available.is_available = true;
         pthread_cond_signal(&work_list->work_available.cond);
@@ -365,12 +405,20 @@ void *worker_routine(void *arg)
                         unregister_work(work);
                 }
                 else
+                        worker_rollback_work(work, work_list);                        
                         /**
                          * we get the refcnt failed,so we rollback
                          * its state to in-sched,and signal waiter
                          * to retry this work.
-                         */
-                        worker_rollback_work(work, work_list);
+                         * # actually,work_get() only fails when
+                         *   work's refcnt drops to _zero_,in this
+                         *   case,the work is unavailable.
+                         *   but register_work() has got refcnt of
+                         *   the work,thus,at there,its refcnt
+                         *   at least is 1.if its refcnt is 0,
+                         *   that means some control path incorrectly
+                         *   has put it.
+                         */                        
         } while (1);
 
         pthread_cleanup_pop(1);

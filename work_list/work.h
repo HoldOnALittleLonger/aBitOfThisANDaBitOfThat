@@ -74,44 +74,8 @@ static inline void release_work_lock(struct work_struct *work)
         pthread_spin_unlock(&work->lock);
 }
 
-/**
- * work_get - get work's refcnt unless refcnt been _zero_
- */
-static inline bool work_get(struct work_struct *work)
-{
-        acquire_work_lock(work);
-        /* we get ref if and only if the object's refcnt
-         * is not _zero_,otherwise,we treat it as the
-         * object is not exists.
-         */
-        if (work->refcnt <= 0) {
-                release_work_lock(work);
-                return false;
-        }
-        work->refcnt++;
-        release_work_lock(work);
-        return true;
-}
-
-/**
- * work_put - put work's refcnt unless refcnt been _zero_,
- *            and if refcnt falls into _zero_,->destructor
- *            will be called on this work
- */
-static inline void work_put(struct work_struct *work)
-{
-        acquire_work_lock(work);
-        if (work->refcnt > 0) {
-                work->refcnt--;
-                if (!work->refcnt) {
-                        release_work_lock(work);        
-                        work->destructor(work);                        
-                        return;
-                }
-
-        }
-        release_work_lock(work);
-}
+extern bool work_get(struct work_struct *);
+extern void work_put(struct work_struct *);
 
 /* modify work's state */
 static inline void modify_work_state(struct work_struct *work, enum work_state new_state)
@@ -121,44 +85,30 @@ static inline void modify_work_state(struct work_struct *work, enum work_state n
         release_work_lock(work);
 }
 
+extern enum work_state __return_work_state(struct work_struct *);
+
 /* test whether work been initialized */
 static inline bool work_is_init(struct work_struct *work)
 {
-        bool ret = false;
-        acquire_work_lock(work);
-        ret = work->state == WORK_STATE_INIT;
-        release_work_lock(work);
-        return ret;
+        return __return_work_state(work) == WORK_STATE_INIT;
 }
 
 /* test whether work been registered */
 static inline bool work_is_sched(struct work_struct *work)
 {
-        bool ret = false;
-        acquire_work_lock(work);
-        ret = work->state == WORK_STATE_INSCHED;
-        release_work_lock(work);
-        return ret;
+        return __return_work_state(work) == WORK_STATE_INSCHED;
 }
 
 /* test whether work been handling by a worker */
 static inline bool work_is_inprogress(struct work_struct *work)
 {
-        bool ret = false;
-        acquire_work_lock(work);
-        ret = work->state == WORK_STATE_INPROGRESS;
-        release_work_lock(work);
-        return ret;
+        return __return_work_state(work) == WORK_STATE_INPROGRESS;
 }
 
 /* test whether work been finished */
 static inline bool work_is_finished(struct work_struct *work)
 {
-        bool ret = false;
-        acquire_work_lock(work);
-        ret = work->state == WORK_STATE_FINISHED;
-        release_work_lock(work);
-        return ret;
+        return __return_work_state(work) == WORK_STATE_FINISHED;
 }
 
 /* return identifier of worker of this work */
