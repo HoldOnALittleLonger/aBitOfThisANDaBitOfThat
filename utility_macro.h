@@ -151,7 +151,7 @@ static double um_profile_time_begin = 0;
 
 #if defined(UM_CONFIG_LIKELY)
 
-/* used compiler feature to similar likely() and unlikely() */
+/* use compiler feature to simulate likely() and unlikely() */
 #define um_compile_time_test_and_expect(__value, __expect) ({  \
         __builtin_const_p((__value)) ?                         \
         !!(__value) : __builtin_expect(!!(__value), __expect); \
@@ -163,21 +163,143 @@ static double um_profile_time_begin = 0;
 #endif /* likely */
 
 #if defined (UM_CONFIG_BIT_OP)
+
 #include <stdint.h>
 
+/* internal helpers for highest_ord */
 /**
- * um_highest_ord - use a loop to calculate the order of the
- *                  most significant bit
- * @v:              the value
- * return:          order of most significant bit,return 0
- *                  if @v is 0
+ * There is a interesting thing,that is
+ * __builtin_clz() on a constant value 0
+ * returns 32,but if we set a variable with
+ * value 0,and pass to __builtin_clz(),it
+ * will returns 31.
+ * !! ACTUALLY,__builtin_clz() ON 0 IS A
+ *    UNDEFINED BEHAVIOR,THE RETURN VALUE
+ *    ACCORDING TO IMPLEMENTATION TO COMPILER,
+ *    FOR GCC,IT RETURNS 32.
+ * !! __builtin_clz() USUALLY RELIES ON 'bsr'
+ *    THE "Bit Scan Reverse" INSTRUCTION,
+ *    'bsr' WITH INPUT OPERAND IS UNDEFINED
+ *    BEHAVIOR TOO,DEPENDS ON PROCESSOR,0 OR
+ *    31,OR OTHER RESULT MAY BE RETURNED.
  */
-static inline uint8_t um_highest_ord(unsigned long long v)
+
+/**
+ * unsigned int & int
+ * # char & unsigned char are considered
+ *   as 32 bits integer.
+ */
+static inline uint8_t __um_highest_ord_u(unsigned int v)
+{
+        return sizeof(typeof(v)) * 8 - __builtin_clz(v) - 1;
+}
+
+/* unsigned long int & long int */
+static inline uint8_t __um_highest_ord_ul(unsigned long v)
+{
+        return sizeof(typeof(v)) * 8 - __builtin_clzl(v) - 1;
+}
+
+/* unsigned long long int & long long int */
+static inline uint8_t __um_highest_ord_ull(unsigned long long v)
+{
+        return sizeof(typeof(v)) * 8 - __builtin_clzll(v) - 1;
+}
+
+/**
+ * _Generic is introduced since C11 standard.
+ * It similar to switch-statement,but based on the
+ * type of its 1st parameter.
+ * # internal impl,do not use it directly.
+ */
+#define __um_highest_ord_dispatcher(v)                                  \
+        _Generic((v),                                                   \
+                 unsigned long int: __um_highest_ord_ul((v)),           \
+                 long int: __um_highest_ord_ul((v)),                    \
+                 unsigned long long int: __um_highest_ord_ull((v)),     \
+                 long long int: __um_highest_ord_ull((v)),              \
+                 default: __um_highest_ord_u((v)))
+
+/* _zero_ checking before enter dispatcher */
+#define __um_highest_ord(v) ((v) != 0 ? __um_highest_ord_dispatcher((v)) : 0)
+
+/**
+ * We place declarations at there because compiler wants them.
+ * But we do not provide impl(s),because representations
+ * of those types are difference from integer type,we want this
+ * only works on integer types(includes char type).
+ * # use compile-time to report bad usage.
+ */
+extern uint8_t __um_highest_ord_dont_use_with_float__(float v);
+extern uint8_t __um_highest_ord_dont_use_with_double__(double v);
+
+/**
+ * um_highest_ord - returns the order of MSB
+ * @v:              integer value
+ * return:          highest order of the value @v;if
+ *                  @v is 0,then returns 0
+ * # user interface
+ * # result 0 will be returned in both cases that
+ *   @v == 0 and @v == 1 .
+ * # the work that counts leading zeros can be done by compiler
+ *   at compile-time. 
+ */
+#define um_highest_ord(v)                                               \
+        _Generic((v),                                                   \
+                 float: __um_highest_ord_dont_use_with_float__((v)),    \
+                 double: __um_highest_ord_dont_use_with_double__((v)),  \
+                 default: __um_highest_ord((v)))
+
+/**
+ * um_highest_ord_useloop - use a loop to calculate the order of the
+ *                          most significant bit(MSB)
+ * @v:                      the value
+ * return:                  order of most significant bit,return 0
+ *                          if @v is 0
+ */
+/* # bad performance
+static inline uint8_t um_highest_ord_useloop(unsigned int v)
 {
         uint8_t ord = 0;
-        while (v != 0) v >>=1, ++ord;
+        while (v != 0) v >>= 1, ++ord;
         return ord ? ord - 1 : 0;
 }
+*/
+
+/**
+ * bit op trick for next power of 2
+ *
+ * procedure npo2(v: value)
+ *   v--
+ *   v := v | (v >> 1)
+ *   v := v | (v >> 2)
+ *   v := v | (v >> 4)
+ *   v := v | (v >> 8)
+ *   v := v | (v >> 16)
+ *   v := v + 1
+ *   return v
+ *
+ * e.g.
+ *   v = 5 => 0000,0101
+ *   v-- => 4 => 0000,0100
+ *   v = 4 | (4 >> 1)
+ *       0000,0100
+ *       0000,0010 |
+ *       0000,0110 => 6
+ *   v = 6 | (6 >> 2)
+ *       0000,0110
+ *       0000,0001 |
+ *       0000,0111 => 7
+ *   v = 7 | (7 >> 4)
+ *       0000,0111
+ *       0000,0000 |
+ *       0000,0111 => 7
+ *   v = 7 | (7 >> 8) => 7
+ *   v = 7 | (7 >> 16) => 7
+ *   v = v + 1 => 7 + 1 => 8
+ *
+ *   next power of 2 of value 5 is 8
+ */
 
 /**
  * UM_NEXT_POWER_OF2 - macro function to calculates the next
@@ -372,8 +494,8 @@ static inline void um_dump_mem(void *mem, size_t range, const char *msg)
 #define um_rmb() um_mb()
 #define um_wmb() um_barrier()
 
-#endif
+#endif /* __x86_64__ end */
 
-#endif
+#endif /* UM_CONFIG_MEMBARRIER end */
 
 #endif /* header end */
