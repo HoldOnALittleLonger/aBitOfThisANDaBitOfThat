@@ -10,14 +10,16 @@ For float type 32 bits :
         base value range : [1.0, 2.0)
         e.g.
           -5.0 == -1.25 * 2^2
-          2.0 == 1.0 * 2^1
-          1.0 == 1.0 * 2^0
-
+           2.0 ==  1.0  * 2^1
+           1.0 ==  1.0  * 2^0
+    
+        H                            L
         +----------------------------+
         | sign | exponent | mantissa |
         +----------------------------+
           |      |          |
           |      |          +--> 23 bits mantissa
+          |      |               set order from higher bit to lower bit,and zero padding
           |      +--> 8 bit exponent
           |           minimum : 00000001 => +1
           |           maximum : 11111111 => -1 /* used for encode special values */
@@ -33,3 +35,105 @@ For float type 32 bits :
                 [0 / 1, 11111111, not 0] => Not a Number
                 
                 [0 / 1, 0, not 0] => Denormalize numbers
+
+        Convert from decimal to binary :
+                Sign bit >
+                  1 => negative
+                  0 => positive
+                Exponent value >
+                  exponent_of_radix_2 + Bias(== 127)
+                Mantissa >
+                  mantissa in binary in the "Scientific Notation" representation
+                  # [bit 0].[bit 1][bit 2]... => binary format for mantissa
+                     |       |      |
+                     |       |      +--> corresponds to 2 ^ (-2)
+                     |       +--> corresponds to 2 ^ (-1)
+                     +--> corresponds to 2 ^ (-0)
+
+                e.g.
+                  FV := -6.25
+                  Sign bit => 1,because it is a negative number
+
+                  6.25 = 6 + 0.25
+                         |   |
+                         |   +--> fractional part
+                         +--> integer part
+                  6 in binary format : 110
+    
+                  0.25 in binary format : 0.01
+                  ! 0.25 = 1 / 4 = 2 ^ (-2)
+                    '2 ^ (-1)' corresponds to the bit 1 in floating point
+                    binary format(from Left to Right,and bit 0 always is 0),
+                    so we can know '2 ^ (-2)' corresponds to the bit 2 in floating point
+                    binary format.
+                    and no '2 ^ (-1)',hence bit 1 is 0,has '2 ^ (-2)',the
+                    bit 2 is 1.
+                    finally,'2 ^ (-2)' can be represented through floating point
+                    binary format '0.01'
+
+                  now combine integer part and mantissa part,it is
+                    110.01
+                  in Scientific Notation with radix is 2
+                    1.1001 * (2 ^ 2)
+                    ! after combination,we need leading 1,so there is no
+                      the representation such as "0.11001".even there is,
+                      we must convert it to get leading 1.
+                      i.e. 0.11001 => 1.1001 * (2 ^ (-1))
+
+                  Exponent value of 6.25
+                    EV := 2 + bias(== 127) = 129
+                  in binary is
+                    1000,0001
+
+                  Mantissa is .1001,and fit from higher bit to lower bit with
+                  zero padding
+                    1001,_zeros_
+
+                  in memory
+                     +--> bit 31
+                     |  +--> bit 30
+                     |  |         +--> bit 22
+                     |  |         |
+                    [1][10000001][10010000000000000000000]
+                     |  |         |
+                     |  |         +--> Mantissa
+                     |  +--> Exponent
+                     +--> Sign bit
+
+        General formula convert back from IEEE 754 to decimal :
+                V := (Sign_bit ? -1 : 1) * (1.0 + Mantissa) * (2 ^ (Exponent - Bias(== 127)))
+                                           #^"hiddent 1",because standard
+                                             floating point numbers are normalized
+                                             e.g. 1.1001
+                                                  not 0.11001
+    
+        Special handling when mantissa cant be written in binary format :
+                for example,the mantissa is 0.37.
+                because 0.37 has not corresponding binary bits such as (2 ^ (-1)),(2 ^ (-2)),
+                we must rounding it to get a "Approximate Value".
+                  0.37 * 2 = 0.74 => get 0
+                  0.74 * 2 = 1.48 => get 1
+                  0.48 * 2 = 0.96 => get 0
+                  0.96 * 2 = 1.92 => get 1
+                  0.92 * 2 = 1.84 => get 1
+                  0.84 * 2 = 1.68 => get 1
+                  0.68 * 2 = 1.36 => get 1
+                  0.36 * 2 = 0.72 => get 0
+                  ...
+                  # repeat until we got a proper "Approximate Value"
+                suppose we end at "0.72",the mantissa is
+                  .01011110
+                integer part is
+                  0
+                binary format is
+                  0.01011110
+                and we need leading 1,so it will be
+                  1.011110 * (2 ^ (-2))
+                exponent value := Bias(== 127) + (-2) = 125
+                finally,the floating point number 0.37,the representation in memory is
+                  [0][01111101][01111000000000000000000]
+                in decimal,the "Approximate Value" maybe
+                  0.37000000476837158
+
+    
+    
